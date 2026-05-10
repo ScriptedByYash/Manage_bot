@@ -11,7 +11,7 @@ ADMIN SETTINGS
 ========================================
 */
 
-const ADMIN_ID = 123456789;
+const ADMIN_ID = 934377942;
 // Replace with your Telegram numeric ID
 
 /*
