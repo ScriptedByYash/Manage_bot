@@ -1,4 +1,5 @@
 const TelegramBot = require('node-telegram-bot-api');
+const fs = require('fs');
 
 const token = process.env.BOT_TOKEN;
 
@@ -6,20 +7,80 @@ const bot = new TelegramBot(token, { polling: true });
 
 /*
 ========================================
-VALID CODES DATABASE
+ADMIN SETTINGS
 ========================================
 */
 
-const validCodes = [
-  "2365",
-  "9821",
-  "5646",
-  "7854"
-];
+const ADMIN_ID = 123456789;
+// Replace with your Telegram numeric ID
 
 /*
 ========================================
-START COMMAND
+LOAD USERS DATABASE
+========================================
+*/
+
+const USERS_FILE = 'users.json';
+
+function loadUsers() {
+    return JSON.parse(fs.readFileSync(USERS_FILE));
+}
+
+function saveUsers(users) {
+    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+}
+
+let users = loadUsers();
+
+/*
+========================================
+AUTO EXPIRY CHECK
+========================================
+*/
+
+function isExpired(expiryDate) {
+
+    const months = {
+        Jan: 0,
+        Feb: 1,
+        Mar: 2,
+        Apr: 3,
+        May: 4,
+        Jun: 5,
+        Jul: 6,
+        Aug: 7,
+        Sep: 8,
+        Oct: 9,
+        Nov: 10,
+        Dec: 11
+    };
+
+    const parts = expiryDate.split('-');
+
+    const day = parseInt(parts[0]);
+    const month = months[parts[1]];
+    const year = parseInt(parts[2]);
+
+    const expiry = new Date(year, month, day);
+    const today = new Date();
+
+    expiry.setHours(0,0,0,0);
+    today.setHours(0,0,0,0);
+
+    return today > expiry;
+}
+
+/*
+========================================
+VALIDATED USERS SESSION
+========================================
+*/
+
+const validatedUsers = {};
+
+/*
+========================================
+START
 ========================================
 */
 
@@ -28,18 +89,12 @@ bot.onText(/\/start/, (msg) => {
     bot.sendMessage(msg.chat.id,
 `🚀 Welcome to OIC Fusion Manager
 
-Available Services:
-✅ OIC Demo Instance
-✅ Fusion Demo Instance
-✅ Combo Plans
-✅ SFTP & ATP Access
-
 Commands:
-/plans - View Pricing
-/support - Contact Admin
-/expiry - Renewal Notice
-/validate CODE - Validate Bill Code
-/newinstance - Instance Information`);
+/plans
+/support
+/validate CODE
+/expiry
+/newinstance`);
 });
 
 /*
@@ -53,11 +108,9 @@ bot.onText(/\/plans/, (msg) => {
     bot.sendMessage(msg.chat.id,
 `💰 Pricing Plans
 
-🔹 OIC Instance — ₹300/month
-🔹 Fusion Instance — ₹300/month
-🔹 Combo Pack — ₹500/month
-
-🎁 SFTP & ATP details included with OIC.`);
+🔹 OIC — ₹300/month
+🔹 Fusion — ₹300/month
+🔹 Combo — ₹500/month`);
 });
 
 /*
@@ -77,57 +130,98 @@ WhatsApp: +919302613759`);
 
 /*
 ========================================
+VALIDATE
+========================================
+*/
+
+bot.onText(/\/validate (.+)/, (msg, match) => {
+
+    users = loadUsers();
+
+    const code = match[1];
+    const chatId = msg.chat.id;
+
+    if(users[code]) {
+
+        if(isExpired(users[code].expiry)) {
+
+            users[code].active = false;
+            saveUsers(users);
+
+            bot.sendMessage(chatId,
+`❌ CODE EXPIRED
+
+Code: ${code}
+
+Status: EXPIRED
+Access: DENIED`);
+
+            return;
+        }
+
+        if(users[code].active === true) {
+
+            validatedUsers[chatId] = code;
+
+            bot.sendMessage(chatId,
+`✅ BILL VALIDATED
+
+Code: ${code}
+
+Status: ACTIVE
+Access: APPROVED`);
+        }
+        else {
+
+            bot.sendMessage(chatId,
+`❌ INVALID OR DISABLED CODE`);
+        }
+    }
+    else {
+
+        bot.sendMessage(chatId,
+`❌ CODE NOT FOUND`);
+    }
+});
+
+/*
+========================================
 EXPIRY
 ========================================
 */
 
 bot.onText(/\/expiry/, (msg) => {
 
-    bot.sendMessage(msg.chat.id,
+    const chatId = msg.chat.id;
+
+    const code = validatedUsers[chatId];
+
+    if(!code) {
+
+        bot.sendMessage(chatId,
+`❌ Access Denied
+
+Validate first using:
+/validate CODE`);
+
+        return;
+    }
+
+    users = loadUsers();
+
+    const user = users[code];
+
+    bot.sendMessage(chatId,
 `⚠️ RENEWAL NOTICE
 
-Code                 : 2365
-Paid                  : 09-May-2026
-Expiry               : 09-June-2026
-Renew Date      : 04-June-2026
+Code                 : ${code}
+Paid                  : ${user.paid}
+Expiry               : ${user.expiry}
+Renew Date      : ${user.renew}
 Renew Contact : +919302613759
 
 Action:
-Contact us before the renew date to keep your instance active.`);
-});
-
-/*
-========================================
-VALIDATE
-Usage:
-/validate 2365
-========================================
-*/
-
-bot.onText(/\/validate (.+)/, (msg, match) => {
-
-    const code = match[1];
-
-    if(validCodes.includes(code)) {
-
-        bot.sendMessage(msg.chat.id,
-`✅ BILL VALIDATED
-
-Code ${code} is currently active.
-
-Status: VALID
-Access: APPROVED`);
-    }
-    else {
-
-        bot.sendMessage(msg.chat.id,
-`❌ INVALID CODE
-
-Code ${code} is not valid or has expired.
-
-Status: INVALID
-Access: DENIED`);
-    }
+Contact us before renew date to keep your instance active.`);
 });
 
 /*
@@ -138,22 +232,86 @@ NEW INSTANCE
 
 bot.onText(/\/newinstance/, (msg) => {
 
-    bot.sendMessage(msg.chat.id,
-`🆕 NEW INSTANCE REQUEST
+    const chatId = msg.chat.id;
 
-Please send the following details:
+    const code = validatedUsers[chatId];
 
-👤 Name:
-📧 Email:
-📱 Mobile Number:
-📦 Required Service:
-   • OIC
-   • Fusion
-   • Combo
+    if(!code) {
 
-💳 Payment Screenshot
+        bot.sendMessage(chatId,
+`❌ Access Denied
 
-Admin will activate your instance shortly.`);
+Validate first using:
+/validate CODE`);
+
+        return;
+    }
+
+    bot.sendMessage(chatId,
+`🆕 INSTANCE INFORMATION
+
+Your instance is active.
+
+Contact Admin:
+Telegram: @KLRAHUL_5646
+WhatsApp: +919302613759`);
 });
 
-console.log("Bot Running...");
+/*
+========================================
+ADD USER
+ADMIN ONLY
+========================================
+
+Usage:
+/adduser 7890 09-May-2026 09-June-2026 04-June-2026
+
+========================================
+*/
+
+bot.onText(/\/adduser (.+)/, (msg, match) => {
+
+    if(msg.from.id !== ADMIN_ID) {
+
+        bot.sendMessage(msg.chat.id,
+`❌ Admin only command`);
+
+        return;
+    }
+
+    users = loadUsers();
+
+    const data = match[1].split(' ');
+
+    if(data.length < 4) {
+
+        bot.sendMessage(msg.chat.id,
+`❌ Invalid Format
+
+Example:
+/adduser 7890 09-May-2026 09-June-2026 04-June-2026`);
+
+        return;
+    }
+
+    const code = data[0];
+    const paid = data[1];
+    const expiry = data[2];
+    const renew = data[3];
+
+    users[code] = {
+        paid,
+        expiry,
+        renew,
+        active: true
+    };
+
+    saveUsers(users);
+
+    bot.sendMessage(msg.chat.id,
+`✅ USER ADDED
+
+Code: ${code}`);
+});
+
+console.log('Bot Running...');
