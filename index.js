@@ -1,5 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
-const fs = require('fs');
+const { GoogleSpreadsheet } = require('google-spreadsheet');
+const { JWT } = require('google-auth-library');
 
 const token = process.env.BOT_TOKEN;
 
@@ -12,25 +13,34 @@ ADMIN SETTINGS
 */
 
 const ADMIN_ID = 934377942;
-// Replace with your Telegram numeric ID
 
 /*
 ========================================
-LOAD USERS DATABASE
+GOOGLE SHEETS CONFIG
 ========================================
 */
 
-const USERS_FILE = 'users.json';
+const serviceAccountAuth = new JWT({
+  email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+  key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+  scopes: ['https://www.googleapis.com/auth/spreadsheets']
+});
 
-function loadUsers() {
-    return JSON.parse(fs.readFileSync(USERS_FILE));
+const doc = new GoogleSpreadsheet(
+  process.env.GOOGLE_SHEET_ID,
+  serviceAccountAuth
+);
+
+/*
+========================================
+LOAD SHEET
+========================================
+*/
+
+async function loadSheet() {
+    await doc.loadInfo();
+    return doc.sheetsByIndex[0];
 }
-
-function saveUsers(users) {
-    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
-}
-
-let users = loadUsers();
 
 /*
 ========================================
@@ -72,7 +82,7 @@ function isExpired(expiryDate) {
 
 /*
 ========================================
-VALIDATED USERS SESSION
+VALIDATED USERS
 ========================================
 */
 
@@ -84,7 +94,7 @@ START
 ========================================
 */
 
-bot.onText(/\/start/, (msg) => {
+bot.onText(/^\/start$/, (msg) => {
 
     bot.sendMessage(msg.chat.id,
 `🚀 Welcome to OIC Fusion Manager
@@ -103,7 +113,7 @@ PLANS
 ========================================
 */
 
-bot.onText(/\/plans/, (msg) => {
+bot.onText(/^\/plans$/, (msg) => {
 
     bot.sendMessage(msg.chat.id,
 `💰 Pricing Plans
@@ -119,7 +129,7 @@ SUPPORT
 ========================================
 */
 
-bot.onText(/\/support/, (msg) => {
+bot.onText(/^\/support$/, (msg) => {
 
     bot.sendMessage(msg.chat.id,
 `📩 Contact Admin
@@ -134,21 +144,30 @@ VALIDATE
 ========================================
 */
 
-bot.onText(/\/validate (.+)/, (msg, match) => {
-
-    users = loadUsers();
+bot.onText(/^\/validate (.+)/, async (msg, match) => {
 
     const code = match[1];
     const chatId = msg.chat.id;
 
-    if(users[code]) {
+    const sheet = await loadSheet();
+    const rows = await sheet.getRows();
 
-        if(isExpired(users[code].expiry)) {
+    const user = rows.find(row => row.Code == code);
 
-            users[code].active = false;
-            saveUsers(users);
+    if(!user) {
 
-            bot.sendMessage(chatId,
+        bot.sendMessage(chatId,
+`❌ CODE NOT FOUND`);
+
+        return;
+    }
+
+    if(isExpired(user.Expiry)) {
+
+        user.Active = 'FALSE';
+        await user.save();
+
+        bot.sendMessage(chatId,
 `❌ CODE EXPIRED
 
 Code: ${code}
@@ -156,31 +175,25 @@ Code: ${code}
 Status: EXPIRED
 Access: DENIED`);
 
-            return;
-        }
+        return;
+    }
 
-        if(users[code].active === true) {
+    if(user.Active === 'TRUE') {
 
-            validatedUsers[chatId] = code;
+        validatedUsers[chatId] = code;
 
-            bot.sendMessage(chatId,
+        bot.sendMessage(chatId,
 `✅ BILL VALIDATED
 
 Code: ${code}
 
 Status: ACTIVE
 Access: APPROVED`);
-        }
-        else {
-
-            bot.sendMessage(chatId,
-`❌ INVALID OR DISABLED CODE`);
-        }
     }
     else {
 
         bot.sendMessage(chatId,
-`❌ CODE NOT FOUND`);
+`❌ INVALID OR DISABLED CODE`);
     }
 });
 
@@ -190,7 +203,7 @@ EXPIRY
 ========================================
 */
 
-bot.onText(/\/expiry/, (msg) => {
+bot.onText(/^\/expiry$/, async (msg) => {
 
     const chatId = msg.chat.id;
 
@@ -207,17 +220,18 @@ Validate first using:
         return;
     }
 
-    users = loadUsers();
+    const sheet = await loadSheet();
+    const rows = await sheet.getRows();
 
-    const user = users[code];
+    const user = rows.find(row => row.Code == code);
 
     bot.sendMessage(chatId,
 `⚠️ RENEWAL NOTICE
 
 Code                 : ${code}
-Paid                  : ${user.paid}
-Expiry               : ${user.expiry}
-Renew Date      : ${user.renew}
+Paid                  : ${user.Paid}
+Expiry               : ${user.Expiry}
+Renew Date      : ${user.Renew}
 Renew Contact : +919302613759
 
 Action:
@@ -230,7 +244,7 @@ NEW INSTANCE
 ========================================
 */
 
-bot.onText(/\/newinstance/, (msg) => {
+bot.onText(/^\/newinstance$/, (msg) => {
 
     const chatId = msg.chat.id;
 
@@ -260,16 +274,10 @@ WhatsApp: +919302613759`);
 /*
 ========================================
 ADD USER
-ADMIN ONLY
-========================================
-
-Usage:
-/adduser 7890 09-May-2026 09-June-2026 04-June-2026
-
 ========================================
 */
 
-bot.onText(/\/adduser (.+)/, (msg, match) => {
+bot.onText(/^\/adduser (.+)/, async (msg, match) => {
 
     if(msg.from.id !== ADMIN_ID) {
 
@@ -278,8 +286,6 @@ bot.onText(/\/adduser (.+)/, (msg, match) => {
 
         return;
     }
-
-    users = loadUsers();
 
     const data = match[1].split(' ');
 
@@ -299,14 +305,15 @@ Example:
     const expiry = data[2];
     const renew = data[3];
 
-    users[code] = {
-        paid,
-        expiry,
-        renew,
-        active: true
-    };
+    const sheet = await loadSheet();
 
-    saveUsers(users);
+    await sheet.addRow({
+        Code: code,
+        Paid: paid,
+        Expiry: expiry,
+        Renew: renew,
+        Active: 'TRUE'
+    });
 
     bot.sendMessage(msg.chat.id,
 `✅ USER ADDED
