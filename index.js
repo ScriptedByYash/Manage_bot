@@ -31,8 +31,10 @@ LOAD SHEET
 */
 
 async function loadSheet() {
+
     await doc.loadInfo();
-    return doc.sheetsByIndex[0];
+
+    return doc.sheetsByTitle['Users'];
 }
 
 /*
@@ -142,10 +144,14 @@ bot.onText(/^\/validate (.+)/, async (msg, match) => {
     try {
 
         const code = match[1].trim();
+
         const chatId = msg.chat.id;
 
         const sheet = await loadSheet();
+
         const rows = await sheet.getRows();
+
+        console.log(rows.map(r => r.Code));
 
         const user = rows.find(
             row => String(row.Code).trim() === String(code).trim()
@@ -162,6 +168,7 @@ bot.onText(/^\/validate (.+)/, async (msg, match) => {
         if (isExpired(user.Expiry)) {
 
             user.Active = 'FALSE';
+
             await user.save();
 
             bot.sendMessage(chatId,
@@ -228,6 +235,7 @@ Validate first using:
         }
 
         const sheet = await loadSheet();
+
         const rows = await sheet.getRows();
 
         const user = rows.find(
