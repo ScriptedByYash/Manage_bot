@@ -9,11 +9,13 @@ const PORT = process.env.PORT || 10000;
 
 const token = process.env.BOT_TOKEN;
 
-const bot = new TelegramBot(token, { polling: true });
+const bot = new TelegramBot(token, {
+    polling: true
+});
 
 /*
 ========================================
-GOOGLE SHEET SETUP
+GOOGLE SHEET CONFIG
 ========================================
 */
 
@@ -25,20 +27,21 @@ const serviceAccountAuth = new JWT({
     scopes: ['https://www.googleapis.com/auth/spreadsheets']
 });
 
-const doc = new GoogleSpreadsheet(SHEET_ID, serviceAccountAuth);
+const doc = new GoogleSpreadsheet(
+    SHEET_ID,
+    serviceAccountAuth
+);
 
 async function loadSheet() {
 
     await doc.loadInfo();
 
-    const sheet = doc.sheetsByTitle['Users'];
-
-    return sheet;
+    return doc.sheetsByTitle['Users'];
 }
 
 /*
 ========================================
-VALIDATED USERS
+VALIDATED USERS SESSION
 ========================================
 */
 
@@ -46,16 +49,59 @@ const validatedUsers = {};
 
 /*
 ========================================
+CHECK EXPIRY
+========================================
+*/
+
+function isExpired(expiryDate) {
+
+    const months = {
+        Jan: 0,
+        Feb: 1,
+        Mar: 2,
+        Apr: 3,
+        May: 4,
+        Jun: 5,
+        Jul: 6,
+        Aug: 7,
+        Sep: 8,
+        Oct: 9,
+        Nov: 10,
+        Dec: 11
+    };
+
+    const parts = expiryDate.split('-');
+
+    const day = parseInt(parts[0]);
+
+    const month = months[parts[1]];
+
+    const year = parseInt(parts[2]);
+
+    const expiry = new Date(year, month, day);
+
+    const today = new Date();
+
+    expiry.setHours(0,0,0,0);
+
+    today.setHours(0,0,0,0);
+
+    return today > expiry;
+}
+
+/*
+========================================
 START
 ========================================
 */
 
-bot.onText(/\/start/, async (msg) => {
+bot.onText(/^\/start$/, async (msg) => {
 
     bot.sendMessage(msg.chat.id,
-`🚀 Welcome to OIC Fusion Manager
+`🚀 Welcome To OIC Fusion Manager
 
 Commands:
+
 /plans
 /support
 /validate CODE
@@ -69,14 +115,14 @@ PLANS
 ========================================
 */
 
-bot.onText(/\/plans/, async (msg) => {
+bot.onText(/^\/plans$/, async (msg) => {
 
     bot.sendMessage(msg.chat.id,
 `💰 Pricing Plans
 
-🔹 OIC — ₹300/month
-🔹 Fusion — ₹300/month
-🔹 Combo — ₹500/month`);
+🔹 OIC Instance — ₹300/month
+🔹 Fusion Instance — ₹300/month
+🔹 Combo Pack — ₹500/month`);
 });
 
 /*
@@ -85,13 +131,16 @@ SUPPORT
 ========================================
 */
 
-bot.onText(/\/support/, async (msg) => {
+bot.onText(/^\/support$/, async (msg) => {
 
     bot.sendMessage(msg.chat.id,
-`📩 Contact Admin
+`📩 Support
 
-Telegram: @KLRAHUL_5646
-WhatsApp: +919302613759`);
+Telegram:
+@KLRAHUL_5646
+
+WhatsApp:
++919302613759`);
 });
 
 /*
@@ -100,7 +149,7 @@ VALIDATE
 ========================================
 */
 
-bot.onText(/\/validate (.+)/, async (msg, match) => {
+bot.onText(/^\/validate (.+)/, async (msg, match) => {
 
     try {
 
@@ -108,11 +157,23 @@ bot.onText(/\/validate (.+)/, async (msg, match) => {
 
         const sheet = await loadSheet();
 
-        const rows = await sheet.getRows();
+        const rows = await sheet.getRows({
+            offset: 0
+        });
 
-        console.log(rows.map(r => r.Code));
+        const users = rows.map(row => ({
+            Code: row.get('Code'),
+            Paid: row.get('Paid'),
+            Expiry: row.get('Expiry'),
+            Renew: row.get('Renew'),
+            Active: row.get('Active')
+        }));
 
-        const user = rows.find(r => String(r.Code).trim() === code);
+        console.log(users);
+
+        const user = users.find(
+            u => String(u.Code).trim() === code
+        );
 
         if(!user) {
 
@@ -122,7 +183,7 @@ bot.onText(/\/validate (.+)/, async (msg, match) => {
             return;
         }
 
-        if(String(user.Active).toUpperCase() !== 'TRUE') {
+        if(String(user.Active).trim().toUpperCase() !== 'TRUE') {
 
             bot.sendMessage(msg.chat.id,
 `❌ CODE DISABLED`);
@@ -130,18 +191,37 @@ bot.onText(/\/validate (.+)/, async (msg, match) => {
             return;
         }
 
-        validatedUsers[msg.chat.id] = code;
+        if(isExpired(user.Expiry)) {
+
+            bot.sendMessage(msg.chat.id,
+`❌ CODE EXPIRED
+
+Code: ${user.Code}
+
+Expiry:
+${user.Expiry}`);
+
+            return;
+        }
+
+        validatedUsers[msg.chat.id] = user.Code;
 
         bot.sendMessage(msg.chat.id,
 `✅ BILL VALIDATED
 
 Code: ${user.Code}
 
-Paid: ${user.Paid}
-Expiry: ${user.Expiry}
-Renew: ${user.Renew}
+Paid:
+${user.Paid}
 
-Access: APPROVED`);
+Expiry:
+${user.Expiry}
+
+Renew:
+${user.Renew}
+
+Status:
+ACTIVE`);
 
     } catch(error) {
 
@@ -160,7 +240,7 @@ EXPIRY
 ========================================
 */
 
-bot.onText(/\/expiry/, async (msg) => {
+bot.onText(/^\/expiry$/, async (msg) => {
 
     try {
 
@@ -171,7 +251,7 @@ bot.onText(/\/expiry/, async (msg) => {
             bot.sendMessage(msg.chat.id,
 `❌ Access Denied
 
-Validate first using:
+Use:
 /validate CODE`);
 
             return;
@@ -179,9 +259,21 @@ Validate first using:
 
         const sheet = await loadSheet();
 
-        const rows = await sheet.getRows();
+        const rows = await sheet.getRows({
+            offset: 0
+        });
 
-        const user = rows.find(r => String(r.Code).trim() === code);
+        const users = rows.map(row => ({
+            Code: row.get('Code'),
+            Paid: row.get('Paid'),
+            Expiry: row.get('Expiry'),
+            Renew: row.get('Renew'),
+            Active: row.get('Active')
+        }));
+
+        const user = users.find(
+            u => String(u.Code).trim() === code
+        );
 
         if(!user) {
 
@@ -194,15 +286,23 @@ Validate first using:
         bot.sendMessage(msg.chat.id,
 `⚠️ RENEWAL NOTICE
 
-Code: ${user.Code}
-Paid: ${user.Paid}
-Expiry: ${user.Expiry}
-Renew: ${user.Renew}
+Code:
+${user.Code}
 
-Contact:
+Paid:
+${user.Paid}
+
+Expiry:
+${user.Expiry}
+
+Renew Date:
+${user.Renew}
+
+Renew Contact:
 +919302613759`);
+    }
 
-    } catch(error) {
+    catch(error) {
 
         console.log(error);
 
@@ -219,7 +319,20 @@ NEW INSTANCE
 ========================================
 */
 
-bot.onText(/\/newinstance/, async (msg) => {
+bot.onText(/^\/newinstance$/, async (msg) => {
+
+    const code = validatedUsers[msg.chat.id];
+
+    if(!code) {
+
+        bot.sendMessage(msg.chat.id,
+`❌ Access Denied
+
+Validate first using:
+/validate CODE`);
+
+        return;
+    }
 
     bot.sendMessage(msg.chat.id,
 `🆕 INSTANCE INFORMATION
@@ -227,13 +340,17 @@ bot.onText(/\/newinstance/, async (msg) => {
 Your instance is active.
 
 Contact Admin:
-Telegram: @KLRAHUL_5646
-WhatsApp: +919302613759`);
+
+Telegram:
+@KLRAHUL_5646
+
+WhatsApp:
++919302613759`);
 });
 
 /*
 ========================================
-TEST USERS API
+TEST API
 ========================================
 */
 
@@ -243,14 +360,16 @@ app.get('/users', async (req, res) => {
 
         const sheet = await loadSheet();
 
-        const rows = await sheet.getRows();
+        const rows = await sheet.getRows({
+            offset: 0
+        });
 
         const users = rows.map(row => ({
-            Code: row.Code,
-            Paid: row.Paid,
-            Expiry: row.Expiry,
-            Renew: row.Renew,
-            Active: row.Active
+            Code: row.get('Code'),
+            Paid: row.get('Paid'),
+            Expiry: row.get('Expiry'),
+            Renew: row.get('Renew'),
+            Active: row.get('Active')
         }));
 
         res.json(users);
