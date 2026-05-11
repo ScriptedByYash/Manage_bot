@@ -149,11 +149,13 @@ VALIDATE
 ========================================
 */
 
-bot.onText(/^\/validate (.+)/, async (msg, match) => {
+bot.onText(/\/validate (.+)/, async (msg, match) => {
 
     try {
 
-        const code = match[1].trim();
+        const code = String(match[1]).trim();
+
+        console.log('Received Code:', code);
 
         const sheet = await loadSheet();
 
@@ -196,7 +198,8 @@ bot.onText(/^\/validate (.+)/, async (msg, match) => {
             bot.sendMessage(msg.chat.id,
 `❌ CODE EXPIRED
 
-Code: ${user.Code}
+Code:
+${user.Code}
 
 Expiry:
 ${user.Expiry}`);
@@ -209,7 +212,8 @@ ${user.Expiry}`);
         bot.sendMessage(msg.chat.id,
 `✅ BILL VALIDATED
 
-Code: ${user.Code}
+Code:
+${user.Code}
 
 Paid:
 ${user.Paid}
@@ -300,9 +304,8 @@ ${user.Renew}
 
 Renew Contact:
 +919302613759`);
-    }
 
-    catch(error) {
+    } catch(error) {
 
         console.log(error);
 
@@ -350,7 +353,7 @@ WhatsApp:
 
 /*
 ========================================
-TEST API
+TEST USERS API
 ========================================
 */
 
