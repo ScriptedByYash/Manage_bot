@@ -9,27 +9,19 @@ const bot = new TelegramBot(token, { polling: true });
 
 /*
 ========================================
-ADMIN SETTINGS
-========================================
-*/
-
-const ADMIN_ID = 934377942;
-
-/*
-========================================
 GOOGLE SHEETS CONFIG
 ========================================
 */
 
 const serviceAccountAuth = new JWT({
-  email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-  key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-  scopes: ['https://www.googleapis.com/auth/spreadsheets']
+    email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    scopes: ['https://www.googleapis.com/auth/spreadsheets']
 });
 
 const doc = new GoogleSpreadsheet(
-  process.env.GOOGLE_SHEET_ID,
-  serviceAccountAuth
+    process.env.GOOGLE_SHEET_ID,
+    serviceAccountAuth
 );
 
 /*
@@ -75,15 +67,15 @@ function isExpired(expiryDate) {
     const expiry = new Date(year, month, day);
     const today = new Date();
 
-    expiry.setHours(0,0,0,0);
-    today.setHours(0,0,0,0);
+    expiry.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
 
     return today > expiry;
 }
 
 /*
 ========================================
-VALIDATED USERS
+VALIDATED USERS SESSION
 ========================================
 */
 
@@ -157,7 +149,7 @@ bot.onText(/^\/validate (.+)/, async (msg, match) => {
 
         const user = rows.find(row => row.Code == code);
 
-        if(!user) {
+        if (!user) {
 
             bot.sendMessage(chatId,
 `❌ CODE NOT FOUND`);
@@ -165,7 +157,7 @@ bot.onText(/^\/validate (.+)/, async (msg, match) => {
             return;
         }
 
-        if(isExpired(user.Expiry)) {
+        if (isExpired(user.Expiry)) {
 
             user.Active = 'FALSE';
             await user.save();
@@ -181,7 +173,7 @@ Access: DENIED`);
             return;
         }
 
-        if(user.Active === 'TRUE') {
+        if (user.Active === 'TRUE') {
 
             validatedUsers[chatId] = code;
 
@@ -199,7 +191,7 @@ Access: APPROVED`);
 `❌ INVALID OR DISABLED CODE`);
         }
 
-    } catch(error) {
+    } catch (error) {
 
         console.log(error);
 
@@ -222,7 +214,7 @@ bot.onText(/^\/expiry$/, async (msg) => {
 
         const code = validatedUsers[chatId];
 
-        if(!code) {
+        if (!code) {
 
             bot.sendMessage(chatId,
 `❌ Access Denied
@@ -238,6 +230,14 @@ Validate first using:
 
         const user = rows.find(row => row.Code == code);
 
+        if (!user) {
+
+            bot.sendMessage(chatId,
+`❌ USER DATA NOT FOUND`);
+
+            return;
+        }
+
         bot.sendMessage(chatId,
 `⚠️ RENEWAL NOTICE
 
@@ -250,7 +250,7 @@ Renew Contact : +919302613759
 Action:
 Contact us before renew date to keep your instance active.`);
 
-    } catch(error) {
+    } catch (error) {
 
         console.log(error);
 
@@ -271,7 +271,7 @@ bot.onText(/^\/newinstance$/, (msg) => {
 
     const code = validatedUsers[chatId];
 
-    if(!code) {
+    if (!code) {
 
         bot.sendMessage(chatId,
 `❌ Access Denied
@@ -290,66 +290,6 @@ Your instance is active.
 Contact Admin:
 Telegram: @KLRAHUL_5646
 WhatsApp: +919302613759`);
-});
-
-/*
-========================================
-ADD USER
-========================================
-*/
-
-bot.onText(/^\/adduser (.+)/, async (msg, match) => {
-
-    try {
-
-        if(msg.from.id !== ADMIN_ID) {
-
-            bot.sendMessage(msg.chat.id,
-`❌ Admin only command`);
-
-            return;
-        }
-
-        const data = match[1].split(' ');
-
-        if(data.length < 4) {
-
-            bot.sendMessage(msg.chat.id,
-`❌ Invalid Format
-
-Example:
-/adduser 7890 09-May-2026 09-Jun-2026 04-Jun-2026`);
-
-            return;
-        }
-
-        const code = data[0];
-        const paid = data[1];
-        const expiry = data[2];
-        const renew = data[3];
-
-        const sheet = await loadSheet();
-
-        await sheet.addRow({
-            Code: code,
-            Paid: paid,
-            Expiry: expiry,
-            Renew: renew,
-            Active: 'TRUE'
-        });
-
-        bot.sendMessage(msg.chat.id,
-`✅ USER ADDED
-
-Code: ${code}`);
-
-    } catch(error) {
-
-        console.log(error);
-
-        bot.sendMessage(msg.chat.id,
-`❌ Add User Error`);
-    }
 });
 
 console.log('Bot Running...');
