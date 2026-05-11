@@ -141,13 +141,15 @@ bot.onText(/^\/validate (.+)/, async (msg, match) => {
 
     try {
 
-        const code = match[1];
+        const code = match[1].trim();
         const chatId = msg.chat.id;
 
         const sheet = await loadSheet();
         const rows = await sheet.getRows();
 
-        const user = rows.find(row => row.Code == code);
+        const user = rows.find(
+            row => String(row.Code).trim() === String(code).trim()
+        );
 
         if (!user) {
 
@@ -173,7 +175,7 @@ Access: DENIED`);
             return;
         }
 
-        if (user.Active === 'TRUE') {
+        if (String(user.Active).trim().toUpperCase() === 'TRUE') {
 
             validatedUsers[chatId] = code;
 
@@ -228,7 +230,9 @@ Validate first using:
         const sheet = await loadSheet();
         const rows = await sheet.getRows();
 
-        const user = rows.find(row => row.Code == code);
+        const user = rows.find(
+            row => String(row.Code).trim() === String(code).trim()
+        );
 
         if (!user) {
 
