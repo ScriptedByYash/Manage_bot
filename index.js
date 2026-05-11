@@ -15,6 +15,61 @@ const bot = new TelegramBot(token, {
 
 /*
 ========================================
+TELEGRAM MENU COMMANDS
+========================================
+*/
+
+bot.setMyCommands([
+
+    {
+        command: 'start',
+        description: 'Start Bot'
+    },
+
+    {
+        command: 'validate',
+        description: 'Validate Your Code'
+    },
+
+    {
+        command: 'expiry',
+        description: 'Check Expiry Date'
+    },
+
+    {
+        command: 'fusioninstance',
+        description: 'Fusion Instance Detail'
+    },
+
+    {
+        command: 'oicinstance',
+        description: 'OIC Instance Detail'
+    },
+
+    {
+        command: 'oicsftpdetail',
+        description: 'OIC SFTP Detail'
+    },
+
+    {
+        command: 'atpdetail',
+        description: 'ATP Detail'
+    },
+
+    {
+        command: 'ftpdetail',
+        description: 'FTP Detail'
+    },
+
+    {
+        command: 'vbcsdbdetail',
+        description: 'VBCS DB Detail'
+    }
+
+]);
+
+/*
+========================================
 GOOGLE SHEET CONFIG
 ========================================
 */
@@ -255,8 +310,6 @@ bot.onText(/^\/start$/, async (msg) => {
 
 AVAILABLE COMMANDS
 
-/plans
-/support
 /validate CODE
 /expiry
 
@@ -266,53 +319,6 @@ AVAILABLE COMMANDS
 /atpdetail
 /ftpdetail
 /vbcsdbdetail
-
-━━━━━━━━━━━━━━`);
-});
-
-/*
-========================================
-PLANS
-========================================
-*/
-
-bot.onText(/^\/plans$/, async (msg) => {
-
-    bot.sendMessage(msg.chat.id,
-`💰 PRICING PLANS
-
-━━━━━━━━━━━━━━
-
-🔹 OIC Instance
-₹300 / Month
-
-🔹 Fusion Instance
-₹300 / Month
-
-🔹 Combo Pack
-₹500 / Month
-
-━━━━━━━━━━━━━━`);
-});
-
-/*
-========================================
-SUPPORT
-========================================
-*/
-
-bot.onText(/^\/support$/, async (msg) => {
-
-    bot.sendMessage(msg.chat.id,
-`📩 SUPPORT
-
-━━━━━━━━━━━━━━
-
-Telegram
-@KLRAHUL_5646
-
-WhatsApp
-+919302613759
 
 ━━━━━━━━━━━━━━`);
 });
@@ -388,14 +394,8 @@ ${user.Code}
 Plan
 ${user.Instances}
 
-Paid Date
-${user.Paid}
-
 Expiry Date
 ${user.Expiry}
-
-Renew Date
-${user.Renew}
 
 Status
 ACTIVE
@@ -485,10 +485,7 @@ bot.onText(/^\/fusioninstance$/, async (msg) => {
         if(!hasFusionAccess(user.Instances)) {
 
             bot.sendMessage(msg.chat.id,
-`❌ FUSION ACCESS NOT AVAILABLE
-
-Your Plan:
-${user.Instances}`);
+`❌ FUSION ACCESS NOT AVAILABLE`);
 
             return;
         }
@@ -535,10 +532,7 @@ bot.onText(/^\/oicinstance$/, async (msg) => {
         if(!hasOICAccess(user.Instances)) {
 
             bot.sendMessage(msg.chat.id,
-`❌ OIC ACCESS NOT AVAILABLE
-
-Your Plan:
-${user.Instances}`);
+`❌ OIC ACCESS NOT AVAILABLE`);
 
             return;
         }
@@ -746,39 +740,6 @@ ${creds.vbcs}
     catch(error) {
 
         console.log(error);
-    }
-});
-
-/*
-========================================
-API TEST
-========================================
-*/
-
-app.get('/users', async (req, res) => {
-
-    try {
-
-        const sheet = await loadUsersSheet();
-
-        const rows = await sheet.getRows();
-
-        const users = rows.map(row => ({
-            Code: row.get('Code'),
-            Paid: row.get('Paid'),
-            Expiry: row.get('Expiry'),
-            Renew: row.get('Renew'),
-            Active: row.get('Active'),
-            Instances: row.get('Instances')
-        }));
-
-        res.json(users);
-
-    } catch(error) {
-
-        res.json({
-            error: error.message
-        });
     }
 });
 
