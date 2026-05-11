@@ -41,7 +41,7 @@ async function loadSheet() {
 
 /*
 ========================================
-VALIDATED USERS SESSION
+VALIDATED USERS
 ========================================
 */
 
@@ -91,6 +91,33 @@ function isExpired(expiryDate) {
 
 /*
 ========================================
+GET USER DATA
+========================================
+*/
+
+async function getUserByCode(code) {
+
+    const sheet = await loadSheet();
+
+    const rows = await sheet.getRows({
+        offset: 0
+    });
+
+    const users = rows.map(row => ({
+        Code: String(row.get('Code')).trim(),
+        Paid: row.get('Paid'),
+        Expiry: row.get('Expiry'),
+        Renew: row.get('Renew'),
+        Active: String(row.get('Active')).trim()
+    }));
+
+    return users.find(
+        u => u.Code === code
+    );
+}
+
+/*
+========================================
 START
 ========================================
 */
@@ -98,9 +125,9 @@ START
 bot.onText(/^\/start$/, async (msg) => {
 
     bot.sendMessage(msg.chat.id,
-`🚀 Welcome To OIC Fusion Manager
+`🚀 OIC Fusion Manager
 
-Commands:
+Available Commands
 
 /plans
 /support
@@ -118,11 +145,20 @@ PLANS
 bot.onText(/^\/plans$/, async (msg) => {
 
     bot.sendMessage(msg.chat.id,
-`💰 Pricing Plans
+`💰 PRICING PLANS
 
-🔹 OIC Instance — ₹300/month
-🔹 Fusion Instance — ₹300/month
-🔹 Combo Pack — ₹500/month`);
+━━━━━━━━━━━━━━
+
+🔹 OIC Instance
+₹300 / Month
+
+🔹 Fusion Instance
+₹300 / Month
+
+🔹 Combo Pack
+₹500 / Month
+
+━━━━━━━━━━━━━━`);
 });
 
 /*
@@ -134,13 +170,17 @@ SUPPORT
 bot.onText(/^\/support$/, async (msg) => {
 
     bot.sendMessage(msg.chat.id,
-`📩 Support
+`📩 SUPPORT
 
-Telegram:
+━━━━━━━━━━━━━━
+
+Telegram
 @KLRAHUL_5646
 
-WhatsApp:
-+919302613759`);
+WhatsApp
++919302613759
+
+━━━━━━━━━━━━━━`);
 });
 
 /*
@@ -162,49 +202,38 @@ bot.on('message', async (msg) => {
         if(parts.length < 2) {
 
             bot.sendMessage(msg.chat.id,
-`❌ USE FORMAT
+`❌ INVALID FORMAT
 
-/validate CODE`);
+Use:
+ /validate CODE`);
 
             return;
         }
 
         const code = parts[1].trim();
 
-        console.log('Received Code:', code);
-
-        const sheet = await loadSheet();
-
-        const rows = await sheet.getRows({
-            offset: 0
-        });
-
-        const users = rows.map(row => ({
-            Code: String(row.get('Code')).trim(),
-            Paid: row.get('Paid'),
-            Expiry: row.get('Expiry'),
-            Renew: row.get('Renew'),
-            Active: String(row.get('Active')).trim()
-        }));
-
-        console.log(users);
-
-        const user = users.find(
-            u => u.Code === code
-        );
+        const user = await getUserByCode(code);
 
         if(!user) {
 
             bot.sendMessage(msg.chat.id,
-`❌ CODE NOT FOUND`);
+`❌ CODE NOT FOUND
 
+Please check your validation code.`);
             return;
         }
 
         if(user.Active.toUpperCase() !== 'TRUE') {
 
             bot.sendMessage(msg.chat.id,
-`❌ CODE DISABLED`);
+`❌ ACCESS DISABLED
+
+Code: ${user.Code}
+
+Status: Disabled
+
+Contact Support:
+@KLRAHUL_5646`);
 
             return;
         }
@@ -212,13 +241,25 @@ bot.on('message', async (msg) => {
         if(isExpired(user.Expiry)) {
 
             bot.sendMessage(msg.chat.id,
-`❌ CODE EXPIRED
+`⚠️ INSTANCE EXPIRED
 
-Code:
+━━━━━━━━━━━━━━
+
+Code
 ${user.Code}
 
-Expiry:
-${user.Expiry}`);
+Expiry Date
+${user.Expiry}
+
+Status
+Expired
+
+━━━━━━━━━━━━━━
+
+Renew Your Instance To Continue Access.
+
+Contact:
+@KLRAHUL_5646`);
 
             return;
         }
@@ -228,27 +269,34 @@ ${user.Expiry}`);
         bot.sendMessage(msg.chat.id,
 `✅ BILL VALIDATED
 
-Code:
+━━━━━━━━━━━━━━
+
+Code
 ${user.Code}
 
-Paid:
+Paid Date
 ${user.Paid}
 
-Expiry:
+Expiry Date
 ${user.Expiry}
 
-Renew:
+Renew Date
 ${user.Renew}
 
-Status:
-ACTIVE`);
+Status
+Active
 
-    } catch(error) {
+━━━━━━━━━━━━━━
+
+Access Approved`);
+    }
+
+    catch(error) {
 
         console.log(error);
 
         bot.sendMessage(msg.chat.id,
-`❌ ERROR
+`❌ SYSTEM ERROR
 
 ${error.message}`);
     }
@@ -269,31 +317,16 @@ bot.onText(/^\/expiry$/, async (msg) => {
         if(!code) {
 
             bot.sendMessage(msg.chat.id,
-`❌ Access Denied
+`❌ ACCESS DENIED
 
-Use:
+Validate First Using
+
 /validate CODE`);
 
             return;
         }
 
-        const sheet = await loadSheet();
-
-        const rows = await sheet.getRows({
-            offset: 0
-        });
-
-        const users = rows.map(row => ({
-            Code: row.get('Code'),
-            Paid: row.get('Paid'),
-            Expiry: row.get('Expiry'),
-            Renew: row.get('Renew'),
-            Active: row.get('Active')
-        }));
-
-        const user = users.find(
-            u => String(u.Code).trim() === code
-        );
+        const user = await getUserByCode(code);
 
         if(!user) {
 
@@ -303,30 +336,61 @@ Use:
             return;
         }
 
-        bot.sendMessage(msg.chat.id,
-`⚠️ RENEWAL NOTICE
+        if(user.Active.toUpperCase() !== 'TRUE' || isExpired(user.Expiry)) {
 
-Code:
+            bot.sendMessage(msg.chat.id,
+`⚠️ INSTANCE EXPIRED
+
+━━━━━━━━━━━━━━
+
+Code
 ${user.Code}
 
-Paid:
-${user.Paid}
-
-Expiry:
+Expiry Date
 ${user.Expiry}
 
-Renew Date:
+Status
+Expired
+
+━━━━━━━━━━━━━━
+
+Renew Required
+
+Contact:
+@KLRAHUL_5646`);
+
+            return;
+        }
+
+        bot.sendMessage(msg.chat.id,
+`📅 RENEWAL NOTICE
+
+━━━━━━━━━━━━━━
+
+Code
+${user.Code}
+
+Paid Date
+${user.Paid}
+
+Expiry Date
+${user.Expiry}
+
+Renew Date
 ${user.Renew}
 
-Renew Contact:
-+919302613759`);
+Renew Contact
++919302613759
 
-    } catch(error) {
+━━━━━━━━━━━━━━`);
+    }
+
+    catch(error) {
 
         console.log(error);
 
         bot.sendMessage(msg.chat.id,
-`❌ ERROR
+`❌ SYSTEM ERROR
 
 ${error.message}`);
     }
@@ -340,36 +404,89 @@ NEW INSTANCE
 
 bot.onText(/^\/newinstance$/, async (msg) => {
 
-    const code = validatedUsers[msg.chat.id];
+    try {
 
-    if(!code) {
+        const code = validatedUsers[msg.chat.id];
 
-        bot.sendMessage(msg.chat.id,
-`❌ Access Denied
+        if(!code) {
 
-Validate first using:
+            bot.sendMessage(msg.chat.id,
+`❌ ACCESS DENIED
+
+Validate First Using
+
 /validate CODE`);
 
-        return;
-    }
+            return;
+        }
 
-    bot.sendMessage(msg.chat.id,
-`🆕 INSTANCE INFORMATION
+        const user = await getUserByCode(code);
 
-Your instance is active.
+        if(!user) {
 
-Contact Admin:
+            bot.sendMessage(msg.chat.id,
+`❌ USER NOT FOUND`);
 
-Telegram:
+            return;
+        }
+
+        if(user.Active.toUpperCase() !== 'TRUE' || isExpired(user.Expiry)) {
+
+            bot.sendMessage(msg.chat.id,
+`⚠️ INSTANCE EXPIRED
+
+━━━━━━━━━━━━━━
+
+Your access has expired.
+
+Please renew your instance.
+
+Contact:
 @KLRAHUL_5646
 
-WhatsApp:
+━━━━━━━━━━━━━━`);
+
+            return;
+        }
+
+        bot.sendMessage(msg.chat.id,
+`🆕 INSTANCE INFORMATION
+
+━━━━━━━━━━━━━━
+
+Your Instance Is Active
+
+Code
+${user.Code}
+
+Expiry Date
+${user.Expiry}
+
+━━━━━━━━━━━━━━
+
+Contact Support
+
+Telegram
+@KLRAHUL_5646
+
+WhatsApp
 +919302613759`);
+    }
+
+    catch(error) {
+
+        console.log(error);
+
+        bot.sendMessage(msg.chat.id,
+`❌ SYSTEM ERROR
+
+${error.message}`);
+    }
 });
 
 /*
 ========================================
-TEST USERS API
+TEST API
 ========================================
 */
 
