@@ -149,11 +149,27 @@ VALIDATE
 ========================================
 */
 
-bot.onText(/\/validate (.+)/, async (msg, match) => {
+bot.on('message', async (msg) => {
 
     try {
 
-        const code = String(match[1]).trim();
+        if(!msg.text) return;
+
+        if(!msg.text.startsWith('/validate')) return;
+
+        const parts = msg.text.split(' ');
+
+        if(parts.length < 2) {
+
+            bot.sendMessage(msg.chat.id,
+`❌ USE FORMAT
+
+/validate CODE`);
+
+            return;
+        }
+
+        const code = parts[1].trim();
 
         console.log('Received Code:', code);
 
@@ -164,17 +180,17 @@ bot.onText(/\/validate (.+)/, async (msg, match) => {
         });
 
         const users = rows.map(row => ({
-            Code: row.get('Code'),
+            Code: String(row.get('Code')).trim(),
             Paid: row.get('Paid'),
             Expiry: row.get('Expiry'),
             Renew: row.get('Renew'),
-            Active: row.get('Active')
+            Active: String(row.get('Active')).trim()
         }));
 
         console.log(users);
 
         const user = users.find(
-            u => String(u.Code).trim() === code
+            u => u.Code === code
         );
 
         if(!user) {
@@ -185,7 +201,7 @@ bot.onText(/\/validate (.+)/, async (msg, match) => {
             return;
         }
 
-        if(String(user.Active).trim().toUpperCase() !== 'TRUE') {
+        if(user.Active.toUpperCase() !== 'TRUE') {
 
             bot.sendMessage(msg.chat.id,
 `❌ CODE DISABLED`);
