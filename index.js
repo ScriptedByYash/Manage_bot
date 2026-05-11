@@ -120,7 +120,11 @@ async function getUserByCode(code) {
         Expiry: row.get('Expiry'),
         Renew: row.get('Renew'),
         Active: String(row.get('Active')).trim(),
-        Instances: String(row.get('Instances')).trim().toUpperCase()
+
+        Instances: String(row.get('Instances'))
+            .trim()
+            .replace(/\s/g, '')
+            .toUpperCase()
     }));
 
     return users.find(
@@ -156,18 +160,84 @@ async function getCredentials() {
 
 /*
 ========================================
-CHECK ACCESS
+ACCESS CHECK
 ========================================
 */
 
 function hasFusionAccess(type) {
 
-    return type === 'FUSION' || type === 'BOTH';
+    return (
+        type === 'FUSION' ||
+        type === 'BOTH'
+    );
 }
 
 function hasOICAccess(type) {
 
-    return type === 'OIC' || type === 'BOTH';
+    return (
+        type === 'OIC' ||
+        type === 'BOTH'
+    );
+}
+
+/*
+========================================
+VALID USER CHECK
+========================================
+*/
+
+async function validateUserAccess(chatId) {
+
+    const code = validatedUsers[chatId];
+
+    if(!code) {
+        return {
+            success: false,
+            message:
+`❌ VALIDATE FIRST
+
+/validate CODE`
+        };
+    }
+
+    const user = await getUserByCode(code);
+
+    if(!user) {
+        return {
+            success: false,
+            message: '❌ USER NOT FOUND'
+        };
+    }
+
+    if(
+        user.Active.toUpperCase() !== 'TRUE' ||
+        isExpired(user.Expiry)
+    ) {
+
+        return {
+            success: false,
+            message:
+`⚠️ INSTANCE EXPIRED
+
+━━━━━━━━━━━━━━
+
+Code
+${user.Code}
+
+Expiry Date
+${user.Expiry}
+
+━━━━━━━━━━━━━━
+
+Contact Support
+@KLRAHUL_5646`
+        };
+    }
+
+    return {
+        success: true,
+        user
+    };
 }
 
 /*
@@ -269,7 +339,7 @@ bot.on('message', async (msg) => {
 `❌ INVALID FORMAT
 
 Use:
- /validate CODE`);
+/validate CODE`);
 
             return;
         }
@@ -282,18 +352,14 @@ Use:
 
             bot.sendMessage(msg.chat.id,
 `❌ CODE NOT FOUND`);
+
             return;
         }
 
         if(user.Active.toUpperCase() !== 'TRUE') {
 
             bot.sendMessage(msg.chat.id,
-`❌ ACCESS DISABLED
-
-Code: ${user.Code}
-
-Contact Support:
-@KLRAHUL_5646`);
+`❌ ACCESS DISABLED`);
 
             return;
         }
@@ -303,18 +369,8 @@ Contact Support:
             bot.sendMessage(msg.chat.id,
 `⚠️ INSTANCE EXPIRED
 
-━━━━━━━━━━━━━━
-
-Code
-${user.Code}
-
 Expiry Date
-${user.Expiry}
-
-━━━━━━━━━━━━━━
-
-Contact Support
-@KLRAHUL_5646`);
+${user.Expiry}`);
 
             return;
         }
@@ -352,7 +408,7 @@ ACTIVE
         console.log(error);
 
         bot.sendMessage(msg.chat.id,
-`❌ SYSTEM ERROR
+`❌ ERROR
 
 ${error.message}`);
     }
@@ -368,29 +424,16 @@ bot.onText(/^\/expiry$/, async (msg) => {
 
     try {
 
-        const code = validatedUsers[msg.chat.id];
+        const result = await validateUserAccess(msg.chat.id);
 
-        if(!code) {
+        if(!result.success) {
 
-            bot.sendMessage(msg.chat.id,
-`❌ ACCESS DENIED
-
-Validate First
-
-/validate CODE`);
+            bot.sendMessage(msg.chat.id, result.message);
 
             return;
         }
 
-        const user = await getUserByCode(code);
-
-        if(!user) {
-
-            bot.sendMessage(msg.chat.id,
-`❌ USER NOT FOUND`);
-
-            return;
-        }
+        const user = result.user;
 
         bot.sendMessage(msg.chat.id,
 `📅 RENEWAL NOTICE
@@ -409,20 +452,12 @@ ${user.Expiry}
 Renew Date
 ${user.Renew}
 
-━━━━━━━━━━━━━━
-
-Contact
-@KLRAHUL_5646`);
+━━━━━━━━━━━━━━`);
     }
 
     catch(error) {
 
         console.log(error);
-
-        bot.sendMessage(msg.chat.id,
-`❌ ERROR
-
-${error.message}`);
     }
 });
 
@@ -436,30 +471,16 @@ bot.onText(/^\/fusioninstance$/, async (msg) => {
 
     try {
 
-        const code = validatedUsers[msg.chat.id];
+        const result = await validateUserAccess(msg.chat.id);
 
-        if(!code) {
+        if(!result.success) {
 
-            bot.sendMessage(msg.chat.id,
-`❌ VALIDATE FIRST
-
-/validate CODE`);
+            bot.sendMessage(msg.chat.id, result.message);
 
             return;
         }
 
-        const user = await getUserByCode(code);
-
-        if(
-            user.Active.toUpperCase() !== 'TRUE' ||
-            isExpired(user.Expiry)
-        ) {
-
-            bot.sendMessage(msg.chat.id,
-`⚠️ INSTANCE EXPIRED`);
-
-            return;
-        }
+        const user = result.user;
 
         if(!hasFusionAccess(user.Instances)) {
 
@@ -487,11 +508,6 @@ ${creds.fusion}
     catch(error) {
 
         console.log(error);
-
-        bot.sendMessage(msg.chat.id,
-`❌ ERROR
-
-${error.message}`);
     }
 });
 
@@ -505,30 +521,16 @@ bot.onText(/^\/oicinstance$/, async (msg) => {
 
     try {
 
-        const code = validatedUsers[msg.chat.id];
+        const result = await validateUserAccess(msg.chat.id);
 
-        if(!code) {
+        if(!result.success) {
 
-            bot.sendMessage(msg.chat.id,
-`❌ VALIDATE FIRST
-
-/validate CODE`);
+            bot.sendMessage(msg.chat.id, result.message);
 
             return;
         }
 
-        const user = await getUserByCode(code);
-
-        if(
-            user.Active.toUpperCase() !== 'TRUE' ||
-            isExpired(user.Expiry)
-        ) {
-
-            bot.sendMessage(msg.chat.id,
-`⚠️ INSTANCE EXPIRED`);
-
-            return;
-        }
+        const user = result.user;
 
         if(!hasOICAccess(user.Instances)) {
 
@@ -569,30 +571,16 @@ bot.onText(/^\/oicsftpdetail$/, async (msg) => {
 
     try {
 
-        const code = validatedUsers[msg.chat.id];
+        const result = await validateUserAccess(msg.chat.id);
 
-        if(!code) {
+        if(!result.success) {
 
-            bot.sendMessage(msg.chat.id,
-`❌ VALIDATE FIRST
-
-/validate CODE`);
+            bot.sendMessage(msg.chat.id, result.message);
 
             return;
         }
 
-        const user = await getUserByCode(code);
-
-        if(
-            user.Active.toUpperCase() !== 'TRUE' ||
-            isExpired(user.Expiry)
-        ) {
-
-            bot.sendMessage(msg.chat.id,
-`⚠️ INSTANCE EXPIRED`);
-
-            return;
-        }
+        const user = result.user;
 
         if(!hasOICAccess(user.Instances)) {
 
@@ -630,30 +618,16 @@ bot.onText(/^\/atpdetail$/, async (msg) => {
 
     try {
 
-        const code = validatedUsers[msg.chat.id];
+        const result = await validateUserAccess(msg.chat.id);
 
-        if(!code) {
+        if(!result.success) {
 
-            bot.sendMessage(msg.chat.id,
-`❌ VALIDATE FIRST
-
-/validate CODE`);
+            bot.sendMessage(msg.chat.id, result.message);
 
             return;
         }
 
-        const user = await getUserByCode(code);
-
-        if(
-            user.Active.toUpperCase() !== 'TRUE' ||
-            isExpired(user.Expiry)
-        ) {
-
-            bot.sendMessage(msg.chat.id,
-`⚠️ INSTANCE EXPIRED`);
-
-            return;
-        }
+        const user = result.user;
 
         if(!hasOICAccess(user.Instances)) {
 
@@ -691,30 +665,16 @@ bot.onText(/^\/ftpdetail$/, async (msg) => {
 
     try {
 
-        const code = validatedUsers[msg.chat.id];
+        const result = await validateUserAccess(msg.chat.id);
 
-        if(!code) {
+        if(!result.success) {
 
-            bot.sendMessage(msg.chat.id,
-`❌ VALIDATE FIRST
-
-/validate CODE`);
+            bot.sendMessage(msg.chat.id, result.message);
 
             return;
         }
 
-        const user = await getUserByCode(code);
-
-        if(
-            user.Active.toUpperCase() !== 'TRUE' ||
-            isExpired(user.Expiry)
-        ) {
-
-            bot.sendMessage(msg.chat.id,
-`⚠️ INSTANCE EXPIRED`);
-
-            return;
-        }
+        const user = result.user;
 
         if(!hasOICAccess(user.Instances)) {
 
@@ -752,30 +712,16 @@ bot.onText(/^\/vbcsdbdetail$/, async (msg) => {
 
     try {
 
-        const code = validatedUsers[msg.chat.id];
+        const result = await validateUserAccess(msg.chat.id);
 
-        if(!code) {
+        if(!result.success) {
 
-            bot.sendMessage(msg.chat.id,
-`❌ VALIDATE FIRST
-
-/validate CODE`);
+            bot.sendMessage(msg.chat.id, result.message);
 
             return;
         }
 
-        const user = await getUserByCode(code);
-
-        if(
-            user.Active.toUpperCase() !== 'TRUE' ||
-            isExpired(user.Expiry)
-        ) {
-
-            bot.sendMessage(msg.chat.id,
-`⚠️ INSTANCE EXPIRED`);
-
-            return;
-        }
+        const user = result.user;
 
         if(!hasOICAccess(user.Instances)) {
 
@@ -805,7 +751,7 @@ ${creds.vbcs}
 
 /*
 ========================================
-TEST API
+API TEST
 ========================================
 */
 
