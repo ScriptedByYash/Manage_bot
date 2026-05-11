@@ -32,11 +32,24 @@ const doc = new GoogleSpreadsheet(
     serviceAccountAuth
 );
 
-async function loadSheet() {
+/*
+========================================
+LOAD SHEETS
+========================================
+*/
+
+async function loadUsersSheet() {
 
     await doc.loadInfo();
 
     return doc.sheetsByTitle['Users'];
+}
+
+async function loadCredentialsSheet() {
+
+    await doc.loadInfo();
+
+    return doc.sheetsByTitle['Credentials'];
 }
 
 /*
@@ -97,23 +110,64 @@ GET USER DATA
 
 async function getUserByCode(code) {
 
-    const sheet = await loadSheet();
+    const sheet = await loadUsersSheet();
 
-    const rows = await sheet.getRows({
-        offset: 0
-    });
+    const rows = await sheet.getRows();
 
     const users = rows.map(row => ({
         Code: String(row.get('Code')).trim(),
         Paid: row.get('Paid'),
         Expiry: row.get('Expiry'),
         Renew: row.get('Renew'),
-        Active: String(row.get('Active')).trim()
+        Active: String(row.get('Active')).trim(),
+        Instances: String(row.get('Instances')).trim().toUpperCase()
     }));
 
     return users.find(
         u => u.Code === code
     );
+}
+
+/*
+========================================
+GET CREDENTIALS
+========================================
+*/
+
+async function getCredentials() {
+
+    const sheet = await loadCredentialsSheet();
+
+    const rows = await sheet.getRows();
+
+    if(rows.length === 0) {
+        return null;
+    }
+
+    return {
+        fusion: rows[0].get('Fusion Detail'),
+        oic: rows[0].get('OIC Detail'),
+        sftp: rows[0].get('SFTP Detail'),
+        atp: rows[0].get('ATP Detail'),
+        ftp: rows[0].get('FTP Detail'),
+        vbcs: rows[0].get('VBCS DB Detail')
+    };
+}
+
+/*
+========================================
+CHECK ACCESS
+========================================
+*/
+
+function hasFusionAccess(type) {
+
+    return type === 'FUSION' || type === 'BOTH';
+}
+
+function hasOICAccess(type) {
+
+    return type === 'OIC' || type === 'BOTH';
 }
 
 /*
@@ -127,13 +181,23 @@ bot.onText(/^\/start$/, async (msg) => {
     bot.sendMessage(msg.chat.id,
 `🚀 OIC Fusion Manager
 
-Available Commands
+━━━━━━━━━━━━━━
+
+AVAILABLE COMMANDS
 
 /plans
 /support
 /validate CODE
 /expiry
-/newinstance`);
+
+/fusioninstance
+/oicinstance
+/oicsftpdetail
+/atpdetail
+/ftpdetail
+/vbcsdbdetail
+
+━━━━━━━━━━━━━━`);
 });
 
 /*
@@ -217,9 +281,7 @@ Use:
         if(!user) {
 
             bot.sendMessage(msg.chat.id,
-`❌ CODE NOT FOUND
-
-Please check your validation code.`);
+`❌ CODE NOT FOUND`);
             return;
         }
 
@@ -229,8 +291,6 @@ Please check your validation code.`);
 `❌ ACCESS DISABLED
 
 Code: ${user.Code}
-
-Status: Disabled
 
 Contact Support:
 @KLRAHUL_5646`);
@@ -251,14 +311,9 @@ ${user.Code}
 Expiry Date
 ${user.Expiry}
 
-Status
-Expired
-
 ━━━━━━━━━━━━━━
 
-Renew Your Instance To Continue Access.
-
-Contact:
+Contact Support
 @KLRAHUL_5646`);
 
             return;
@@ -274,6 +329,9 @@ Contact:
 Code
 ${user.Code}
 
+Plan
+${user.Instances}
+
 Paid Date
 ${user.Paid}
 
@@ -284,11 +342,9 @@ Renew Date
 ${user.Renew}
 
 Status
-Active
+ACTIVE
 
-━━━━━━━━━━━━━━
-
-Access Approved`);
+━━━━━━━━━━━━━━`);
     }
 
     catch(error) {
@@ -319,7 +375,7 @@ bot.onText(/^\/expiry$/, async (msg) => {
             bot.sendMessage(msg.chat.id,
 `❌ ACCESS DENIED
 
-Validate First Using
+Validate First
 
 /validate CODE`);
 
@@ -332,32 +388,6 @@ Validate First Using
 
             bot.sendMessage(msg.chat.id,
 `❌ USER NOT FOUND`);
-
-            return;
-        }
-
-        if(user.Active.toUpperCase() !== 'TRUE' || isExpired(user.Expiry)) {
-
-            bot.sendMessage(msg.chat.id,
-`⚠️ INSTANCE EXPIRED
-
-━━━━━━━━━━━━━━
-
-Code
-${user.Code}
-
-Expiry Date
-${user.Expiry}
-
-Status
-Expired
-
-━━━━━━━━━━━━━━
-
-Renew Required
-
-Contact:
-@KLRAHUL_5646`);
 
             return;
         }
@@ -370,8 +400,8 @@ Contact:
 Code
 ${user.Code}
 
-Paid Date
-${user.Paid}
+Plan
+${user.Instances}
 
 Expiry Date
 ${user.Expiry}
@@ -379,10 +409,10 @@ ${user.Expiry}
 Renew Date
 ${user.Renew}
 
-Renew Contact
-+919302613759
+━━━━━━━━━━━━━━
 
-━━━━━━━━━━━━━━`);
+Contact
+@KLRAHUL_5646`);
     }
 
     catch(error) {
@@ -390,7 +420,7 @@ Renew Contact
         console.log(error);
 
         bot.sendMessage(msg.chat.id,
-`❌ SYSTEM ERROR
+`❌ ERROR
 
 ${error.message}`);
     }
@@ -398,11 +428,11 @@ ${error.message}`);
 
 /*
 ========================================
-NEW INSTANCE
+FUSION INSTANCE
 ========================================
 */
 
-bot.onText(/^\/newinstance$/, async (msg) => {
+bot.onText(/^\/fusioninstance$/, async (msg) => {
 
     try {
 
@@ -411,9 +441,7 @@ bot.onText(/^\/newinstance$/, async (msg) => {
         if(!code) {
 
             bot.sendMessage(msg.chat.id,
-`❌ ACCESS DENIED
-
-Validate First Using
+`❌ VALIDATE FIRST
 
 /validate CODE`);
 
@@ -422,55 +450,38 @@ Validate First Using
 
         const user = await getUserByCode(code);
 
-        if(!user) {
+        if(
+            user.Active.toUpperCase() !== 'TRUE' ||
+            isExpired(user.Expiry)
+        ) {
 
             bot.sendMessage(msg.chat.id,
-`❌ USER NOT FOUND`);
+`⚠️ INSTANCE EXPIRED`);
 
             return;
         }
 
-        if(user.Active.toUpperCase() !== 'TRUE' || isExpired(user.Expiry)) {
+        if(!hasFusionAccess(user.Instances)) {
 
             bot.sendMessage(msg.chat.id,
-`⚠️ INSTANCE EXPIRED
+`❌ FUSION ACCESS NOT AVAILABLE
 
-━━━━━━━━━━━━━━
-
-Your access has expired.
-
-Please renew your instance.
-
-Contact:
-@KLRAHUL_5646
-
-━━━━━━━━━━━━━━`);
+Your Plan:
+${user.Instances}`);
 
             return;
         }
+
+        const creds = await getCredentials();
 
         bot.sendMessage(msg.chat.id,
-`🆕 INSTANCE INFORMATION
+`🚀 FUSION INSTANCE DETAIL
 
 ━━━━━━━━━━━━━━
 
-Your Instance Is Active
+${creds.fusion}
 
-Code
-${user.Code}
-
-Expiry Date
-${user.Expiry}
-
-━━━━━━━━━━━━━━
-
-Contact Support
-
-Telegram
-@KLRAHUL_5646
-
-WhatsApp
-+919302613759`);
+━━━━━━━━━━━━━━`);
     }
 
     catch(error) {
@@ -478,9 +489,317 @@ WhatsApp
         console.log(error);
 
         bot.sendMessage(msg.chat.id,
-`❌ SYSTEM ERROR
+`❌ ERROR
 
 ${error.message}`);
+    }
+});
+
+/*
+========================================
+OIC INSTANCE
+========================================
+*/
+
+bot.onText(/^\/oicinstance$/, async (msg) => {
+
+    try {
+
+        const code = validatedUsers[msg.chat.id];
+
+        if(!code) {
+
+            bot.sendMessage(msg.chat.id,
+`❌ VALIDATE FIRST
+
+/validate CODE`);
+
+            return;
+        }
+
+        const user = await getUserByCode(code);
+
+        if(
+            user.Active.toUpperCase() !== 'TRUE' ||
+            isExpired(user.Expiry)
+        ) {
+
+            bot.sendMessage(msg.chat.id,
+`⚠️ INSTANCE EXPIRED`);
+
+            return;
+        }
+
+        if(!hasOICAccess(user.Instances)) {
+
+            bot.sendMessage(msg.chat.id,
+`❌ OIC ACCESS NOT AVAILABLE
+
+Your Plan:
+${user.Instances}`);
+
+            return;
+        }
+
+        const creds = await getCredentials();
+
+        bot.sendMessage(msg.chat.id,
+`☁️ OIC INSTANCE DETAIL
+
+━━━━━━━━━━━━━━
+
+${creds.oic}
+
+━━━━━━━━━━━━━━`);
+    }
+
+    catch(error) {
+
+        console.log(error);
+    }
+});
+
+/*
+========================================
+SFTP DETAIL
+========================================
+*/
+
+bot.onText(/^\/oicsftpdetail$/, async (msg) => {
+
+    try {
+
+        const code = validatedUsers[msg.chat.id];
+
+        if(!code) {
+
+            bot.sendMessage(msg.chat.id,
+`❌ VALIDATE FIRST
+
+/validate CODE`);
+
+            return;
+        }
+
+        const user = await getUserByCode(code);
+
+        if(
+            user.Active.toUpperCase() !== 'TRUE' ||
+            isExpired(user.Expiry)
+        ) {
+
+            bot.sendMessage(msg.chat.id,
+`⚠️ INSTANCE EXPIRED`);
+
+            return;
+        }
+
+        if(!hasOICAccess(user.Instances)) {
+
+            bot.sendMessage(msg.chat.id,
+`❌ OIC ACCESS NOT AVAILABLE`);
+
+            return;
+        }
+
+        const creds = await getCredentials();
+
+        bot.sendMessage(msg.chat.id,
+`📂 SFTP DETAIL
+
+━━━━━━━━━━━━━━
+
+${creds.sftp}
+
+━━━━━━━━━━━━━━`);
+    }
+
+    catch(error) {
+
+        console.log(error);
+    }
+});
+
+/*
+========================================
+ATP DETAIL
+========================================
+*/
+
+bot.onText(/^\/atpdetail$/, async (msg) => {
+
+    try {
+
+        const code = validatedUsers[msg.chat.id];
+
+        if(!code) {
+
+            bot.sendMessage(msg.chat.id,
+`❌ VALIDATE FIRST
+
+/validate CODE`);
+
+            return;
+        }
+
+        const user = await getUserByCode(code);
+
+        if(
+            user.Active.toUpperCase() !== 'TRUE' ||
+            isExpired(user.Expiry)
+        ) {
+
+            bot.sendMessage(msg.chat.id,
+`⚠️ INSTANCE EXPIRED`);
+
+            return;
+        }
+
+        if(!hasOICAccess(user.Instances)) {
+
+            bot.sendMessage(msg.chat.id,
+`❌ OIC ACCESS NOT AVAILABLE`);
+
+            return;
+        }
+
+        const creds = await getCredentials();
+
+        bot.sendMessage(msg.chat.id,
+`🗄 ATP DETAIL
+
+━━━━━━━━━━━━━━
+
+${creds.atp}
+
+━━━━━━━━━━━━━━`);
+    }
+
+    catch(error) {
+
+        console.log(error);
+    }
+});
+
+/*
+========================================
+FTP DETAIL
+========================================
+*/
+
+bot.onText(/^\/ftpdetail$/, async (msg) => {
+
+    try {
+
+        const code = validatedUsers[msg.chat.id];
+
+        if(!code) {
+
+            bot.sendMessage(msg.chat.id,
+`❌ VALIDATE FIRST
+
+/validate CODE`);
+
+            return;
+        }
+
+        const user = await getUserByCode(code);
+
+        if(
+            user.Active.toUpperCase() !== 'TRUE' ||
+            isExpired(user.Expiry)
+        ) {
+
+            bot.sendMessage(msg.chat.id,
+`⚠️ INSTANCE EXPIRED`);
+
+            return;
+        }
+
+        if(!hasOICAccess(user.Instances)) {
+
+            bot.sendMessage(msg.chat.id,
+`❌ OIC ACCESS NOT AVAILABLE`);
+
+            return;
+        }
+
+        const creds = await getCredentials();
+
+        bot.sendMessage(msg.chat.id,
+`📁 FTP DETAIL
+
+━━━━━━━━━━━━━━
+
+${creds.ftp}
+
+━━━━━━━━━━━━━━`);
+    }
+
+    catch(error) {
+
+        console.log(error);
+    }
+});
+
+/*
+========================================
+VBCS DB DETAIL
+========================================
+*/
+
+bot.onText(/^\/vbcsdbdetail$/, async (msg) => {
+
+    try {
+
+        const code = validatedUsers[msg.chat.id];
+
+        if(!code) {
+
+            bot.sendMessage(msg.chat.id,
+`❌ VALIDATE FIRST
+
+/validate CODE`);
+
+            return;
+        }
+
+        const user = await getUserByCode(code);
+
+        if(
+            user.Active.toUpperCase() !== 'TRUE' ||
+            isExpired(user.Expiry)
+        ) {
+
+            bot.sendMessage(msg.chat.id,
+`⚠️ INSTANCE EXPIRED`);
+
+            return;
+        }
+
+        if(!hasOICAccess(user.Instances)) {
+
+            bot.sendMessage(msg.chat.id,
+`❌ OIC ACCESS NOT AVAILABLE`);
+
+            return;
+        }
+
+        const creds = await getCredentials();
+
+        bot.sendMessage(msg.chat.id,
+`🗃 VBCS DB DETAIL
+
+━━━━━━━━━━━━━━
+
+${creds.vbcs}
+
+━━━━━━━━━━━━━━`);
+    }
+
+    catch(error) {
+
+        console.log(error);
     }
 });
 
@@ -494,25 +813,22 @@ app.get('/users', async (req, res) => {
 
     try {
 
-        const sheet = await loadSheet();
+        const sheet = await loadUsersSheet();
 
-        const rows = await sheet.getRows({
-            offset: 0
-        });
+        const rows = await sheet.getRows();
 
         const users = rows.map(row => ({
             Code: row.get('Code'),
             Paid: row.get('Paid'),
             Expiry: row.get('Expiry'),
             Renew: row.get('Renew'),
-            Active: row.get('Active')
+            Active: row.get('Active'),
+            Instances: row.get('Instances')
         }));
 
         res.json(users);
 
     } catch(error) {
-
-        console.log(error);
 
         res.json({
             error: error.message
