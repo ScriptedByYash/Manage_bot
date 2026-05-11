@@ -1,6 +1,7 @@
 const TelegramBot = require('node-telegram-bot-api');
 const { GoogleSpreadsheet } = require('google-spreadsheet');
 const { JWT } = require('google-auth-library');
+const express = require('express');
 
 const token = process.env.BOT_TOKEN;
 
@@ -146,28 +147,30 @@ VALIDATE
 
 bot.onText(/^\/validate (.+)/, async (msg, match) => {
 
-    const code = match[1];
-    const chatId = msg.chat.id;
+    try {
 
-    const sheet = await loadSheet();
-    const rows = await sheet.getRows();
+        const code = match[1];
+        const chatId = msg.chat.id;
 
-    const user = rows.find(row => row.Code == code);
+        const sheet = await loadSheet();
+        const rows = await sheet.getRows();
 
-    if(!user) {
+        const user = rows.find(row => row.Code == code);
 
-        bot.sendMessage(chatId,
+        if(!user) {
+
+            bot.sendMessage(chatId,
 `❌ CODE NOT FOUND`);
 
-        return;
-    }
+            return;
+        }
 
-    if(isExpired(user.Expiry)) {
+        if(isExpired(user.Expiry)) {
 
-        user.Active = 'FALSE';
-        await user.save();
+            user.Active = 'FALSE';
+            await user.save();
 
-        bot.sendMessage(chatId,
+            bot.sendMessage(chatId,
 `❌ CODE EXPIRED
 
 Code: ${code}
@@ -175,25 +178,33 @@ Code: ${code}
 Status: EXPIRED
 Access: DENIED`);
 
-        return;
-    }
+            return;
+        }
 
-    if(user.Active === 'TRUE') {
+        if(user.Active === 'TRUE') {
 
-        validatedUsers[chatId] = code;
+            validatedUsers[chatId] = code;
 
-        bot.sendMessage(chatId,
+            bot.sendMessage(chatId,
 `✅ BILL VALIDATED
 
 Code: ${code}
 
 Status: ACTIVE
 Access: APPROVED`);
-    }
-    else {
+        }
+        else {
 
-        bot.sendMessage(chatId,
+            bot.sendMessage(chatId,
 `❌ INVALID OR DISABLED CODE`);
+        }
+
+    } catch(error) {
+
+        console.log(error);
+
+        bot.sendMessage(msg.chat.id,
+`❌ Validation Error`);
     }
 });
 
@@ -205,27 +216,29 @@ EXPIRY
 
 bot.onText(/^\/expiry$/, async (msg) => {
 
-    const chatId = msg.chat.id;
+    try {
 
-    const code = validatedUsers[chatId];
+        const chatId = msg.chat.id;
 
-    if(!code) {
+        const code = validatedUsers[chatId];
 
-        bot.sendMessage(chatId,
+        if(!code) {
+
+            bot.sendMessage(chatId,
 `❌ Access Denied
 
 Validate first using:
 /validate CODE`);
 
-        return;
-    }
+            return;
+        }
 
-    const sheet = await loadSheet();
-    const rows = await sheet.getRows();
+        const sheet = await loadSheet();
+        const rows = await sheet.getRows();
 
-    const user = rows.find(row => row.Code == code);
+        const user = rows.find(row => row.Code == code);
 
-    bot.sendMessage(chatId,
+        bot.sendMessage(chatId,
 `⚠️ RENEWAL NOTICE
 
 Code                 : ${code}
@@ -236,6 +249,14 @@ Renew Contact : +919302613759
 
 Action:
 Contact us before renew date to keep your instance active.`);
+
+    } catch(error) {
+
+        console.log(error);
+
+        bot.sendMessage(msg.chat.id,
+`❌ Expiry Error`);
+    }
 });
 
 /*
@@ -279,46 +300,74 @@ ADD USER
 
 bot.onText(/^\/adduser (.+)/, async (msg, match) => {
 
-    if(msg.from.id !== ADMIN_ID) {
+    try {
 
-        bot.sendMessage(msg.chat.id,
+        if(msg.from.id !== ADMIN_ID) {
+
+            bot.sendMessage(msg.chat.id,
 `❌ Admin only command`);
 
-        return;
-    }
+            return;
+        }
 
-    const data = match[1].split(' ');
+        const data = match[1].split(' ');
 
-    if(data.length < 4) {
+        if(data.length < 4) {
 
-        bot.sendMessage(msg.chat.id,
+            bot.sendMessage(msg.chat.id,
 `❌ Invalid Format
 
 Example:
-/adduser 7890 09-May-2026 09-June-2026 04-June-2026`);
+/adduser 7890 09-May-2026 09-Jun-2026 04-Jun-2026`);
 
-        return;
-    }
+            return;
+        }
 
-    const code = data[0];
-    const paid = data[1];
-    const expiry = data[2];
-    const renew = data[3];
+        const code = data[0];
+        const paid = data[1];
+        const expiry = data[2];
+        const renew = data[3];
 
-    const sheet = await loadSheet();
+        const sheet = await loadSheet();
 
-    await sheet.addRow({
-        Code: code,
-        Paid: paid,
-        Expiry: expiry,
-        Renew: renew,
-        Active: 'TRUE'
-    });
+        await sheet.addRow({
+            Code: code,
+            Paid: paid,
+            Expiry: expiry,
+            Renew: renew,
+            Active: 'TRUE'
+        });
 
-    bot.sendMessage(msg.chat.id,
+        bot.sendMessage(msg.chat.id,
 `✅ USER ADDED
 
 Code: ${code}`);
+
+    } catch(error) {
+
+        console.log(error);
+
+        bot.sendMessage(msg.chat.id,
+`❌ Add User Error`);
+    }
 });
 
 console.log('Bot Running...');
+
+/*
+========================================
+EXPRESS SERVER
+========================================
+*/
+
+const app = express();
+
+app.get('/', (req, res) => {
+    res.send('Bot Running');
+});
+
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
