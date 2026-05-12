@@ -374,6 +374,8 @@ Example:
 `🚀 Welcome ${user.UserName || 'User'}
 
 ━━━━━━━━━━━━━━
+🔑 Code
+${user.Code}
 
 📦 Plan
 ${user.Instances}
@@ -609,6 +611,9 @@ bot.onText(/^\/expiry$/, async (msg) => {
 
 👤 User
 ${user.UserName || 'N/A'}
+
+🔑 Code
+${user.Code}
 
 📦 Plan
 ${user.Instances}
