@@ -378,7 +378,7 @@ Welcome to 🚀 Oracle Instance Provider 🚀
 Please validate your code first.
 
 Example:
-/validate 2366
+/validate 1111
 
 👨‍💼 Support
 /admincontact
