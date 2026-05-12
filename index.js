@@ -55,7 +55,7 @@ async function getUsers() {
         UserTelegramId: row.get('User Telegram Id')
     }));
 }
-
+console.log("SHEET_ID:", process.env.SHEET_ID);
 function parseDate(dateStr) {
 
     const months = {
