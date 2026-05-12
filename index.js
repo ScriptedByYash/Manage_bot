@@ -369,51 +369,70 @@ bot.onText(/^\/start$/, async (msg) => {
     if(!user) {
 
         bot.sendMessage(msg.chat.id,
-`🚀 OIC Fusion Manager
+`╔════════════════════════╗
+🚀 Oracle Instance Provider 🚀
+╚════════════════════════╝
 
-━━━━━━━━━━━━━━
+Welcome to 🚀 Oracle Instance Provider 🚀
 
 Please validate your code first.
 
 Example:
 /validate 2366
 
-Need Help?
+👨‍💼 Support
 /admincontact
 
-━━━━━━━━━━━━━━`);
+──────────────────────────
+
+⚡ Fast Access | 🔒 Secure Details | 📞 24×7 Support`);
 
         return;
     }
 
     bot.sendMessage(msg.chat.id,
-`🚀 Welcome ${user.UserName || 'User'}
+`╔════════════════════════╗
+🚀 Oracle Instance Provider 🚀
+╚════════════════════════╝
 
-━━━━━━━━━━━━━━
+Welcome to 🚀 Oracle Instance Provider 🚀
 
-🔑 Code
-${user.Code}
+Hello ${user.UserName || 'User'}!
+I provide high-speed access to Oracle Fusion and OIC instances, including SFTP & ATP details.
 
-📦 Plan
-${user.Instances}
+📋 COMMANDS
+──────────────────────────
 
-📅 Expiry
-${user.Expiry}
+📅 /expiry
+  (Check Expiry Date)
 
-AVAILABLE COMMANDS
+🔄 /renew
+  (Renew Subscription)
 
-/expiry
-/renew
-/admincontact
+👨‍💼 /admincontact
+  (Contact Admin)
 
-/fusioninstance
-/oicinstance
-/oicsftpdetail
-/atpdetail
-/ftpdetail
-/vbcsdbdetail
+🚀 /fusioninstance
+  (Fusion Instance Details)
 
-━━━━━━━━━━━━━━`);
+☁️ /oicinstance
+  (OIC Instance Details)
+
+📂 /oicsftpdetail
+  (OIC SFTP Details)
+
+🗄 /atpdetail
+  (ATP Database Details)
+
+📁 /ftpdetail
+  (FTP Details)
+
+🗃 /vbcsdbdetail
+  (VBCS Database Details)
+
+──────────────────────────
+
+⚡ Fast Access | 🔒 Secure Details | 📞 24×7 Support`);
 });
 
 /*
