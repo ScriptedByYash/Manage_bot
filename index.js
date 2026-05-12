@@ -109,14 +109,6 @@ async function loadCredentialsSheet() {
 
 /*
 ========================================
-VALIDATED USERS
-========================================
-*/
-
-const validatedUsers = {};
-
-/*
-========================================
 CHECK EXPIRY
 ========================================
 */
@@ -463,7 +455,7 @@ ${user.Expiry}`);
 
         /*
         ========================================
-        TELEGRAM ID SECURITY
+        TELEGRAM SECURITY
         ========================================
         */
 
@@ -480,20 +472,23 @@ ${user.Expiry}`);
 
         /*
         ========================================
-        ADMIN APPROVAL ONLY IF TELEGRAM ID EMPTY
+        FIRST TIME USER
         ========================================
         */
 
         if(
-            process.env.ADMIN_ID &&
-            (
-                !user.UserTelegramId ||
-                user.UserTelegramId.trim() === ''
-            )
+            !user.UserTelegramId ||
+            user.UserTelegramId.trim() === ''
         ) {
 
-            bot.sendMessage(
-                process.env.ADMIN_ID,
+            /*
+            ADMIN ALERT
+            */
+
+            if(process.env.ADMIN_ID) {
+
+                bot.sendMessage(
+                    process.env.ADMIN_ID,
 
 `🚨 NEW USER VALIDATION
 
@@ -521,10 +516,35 @@ ${user.UserCountryCode || 'N/A'}
 ${user.UserMobile || 'N/A'}
 
 ━━━━━━━━━━━━━━`
-            );
+                );
+            }
+
+            /*
+            WAIT MESSAGE
+            */
+
+            bot.sendMessage(msg.chat.id,
+`⏳ REQUEST SUBMITTED
+
+━━━━━━━━━━━━━━
+
+Your validation request has been sent to admin.
+
+Please wait for approval.
+
+Approx Time
+5 Minutes
+
+━━━━━━━━━━━━━━`);
+
+            return;
         }
 
-        validatedUsers[msg.chat.id] = user.Code;
+        /*
+        ========================================
+        APPROVED USER
+        ========================================
+        */
 
         bot.sendMessage(msg.chat.id,
 `✅ BILL VALIDATED
@@ -547,6 +567,7 @@ ${user.Expiry}
 ACTIVE
 
 ━━━━━━━━━━━━━━`);
+
     }
 
     catch(error) {
