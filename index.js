@@ -1,594 +1,54 @@
+const express = require('express');
 const TelegramBot = require('node-telegram-bot-api');
 const { GoogleSpreadsheet } = require('google-spreadsheet');
 const { JWT } = require('google-auth-library');
-const express = require('express');
 
 const app = express();
 
-const bot = new TelegramBot(process.env.BOT_TOKEN, {
+const PORT = process.env.PORT || 10000;
+
+const token = process.env.BOT_TOKEN;
+
+const bot = new TelegramBot(token, {
     polling: true
 });
 
-const ADMIN_ID = process.env.ADMIN_ID;
-
-const serviceAccountAuth = new JWT({
-    email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-});
-
-const doc = new GoogleSpreadsheet(
-    process.env.SHEET_ID,
-    serviceAccountAuth
-);
-
-let usersSheet;
-let credentialsSheet;
-
-async function loadSheet() {
-
-    await doc.loadInfo();
-
-    usersSheet = doc.sheetsByTitle['Users'];
-    credentialsSheet = doc.sheetsByTitle['Credentials'];
-
-    console.log('Google Sheets Loaded');
-}
-
-loadSheet();
-
-async function getUsers() {
-
-    const rows = await usersSheet.getRows();
-
-    return rows.map(row => ({
-        Code: row.get('Code'),
-        Paid: row.get('Paid'),
-        Expiry: row.get('Expiry'),
-        Renew: row.get('Renew'),
-        Active: row.get('Active'),
-        Instences: row.get('Instences'),
-        LastPayment: row.get('Last payment'),
-        UserName: row.get('User Name'),
-        UserCountryCode: row.get('User Country Code'),
-        UserMobile: row.get('User Mobile'),
-        UserTelegramId: row.get('User Telegram Id')
-    }));
-}
-console.log("SHEET_ID:", process.env.SHEET_ID);
-function parseDate(dateStr) {
-
-    const months = {
-        Jan: 0,
-        Feb: 1,
-        Mar: 2,
-        Apr: 3,
-        May: 4,
-        Jun: 5,
-        Jul: 6,
-        Aug: 7,
-        Sep: 8,
-        Oct: 9,
-        Nov: 10,
-        Dec: 11
-    };
-
-    const parts = dateStr.split('-');
-
-    return new Date(
-        parseInt(parts[2]),
-        months[parts[1]],
-        parseInt(parts[0])
-    );
-}
-
-function isExpired(expiryDate) {
-
-    const today = new Date();
-
-    today.setHours(0, 0, 0, 0);
-
-    return parseDate(expiryDate) < today;
-}
-
-async function validateUser(code, telegramId, telegramUser) {
-
-    const users = await getUsers();
-
-    const user = users.find(
-        u => u.Code === code
-    );
-
-    if (!user) {
-
-        return {
-            valid: false,
-            message: '❌ CODE NOT FOUND'
-        };
-    }
-
-    if (user.Active !== 'TRUE') {
-
-        return {
-            valid: false,
-            message: '❌ ACCESS DISABLED'
-        };
-    }
-
-    if (isExpired(user.Expiry)) {
-
-        return {
-            valid: false,
-            message:
-                '❌ INSTANCE EXPIRED\n\nPlease renew your subscription.'
-        };
-    }
-
-    // TELEGRAM ID SECURITY
-
-    if (
-        user.UserTelegramId &&
-        user.UserTelegramId !== telegramId.toString()
-    ) {
-
-        return {
-            valid: false,
-            message:
-                '❌ THIS CODE IS ALREADY LINKED TO ANOTHER TELEGRAM ACCOUNT'
-        };
-    }
-
-    // FIRST TIME VALIDATION
-
-    if (!user.UserTelegramId) {
-
-        if (ADMIN_ID) {
-
-            bot.sendMessage(
-                ADMIN_ID,
-                `
-🚨 NEW USER VALIDATION
-
-Code: ${user.Code}
-User Name: ${user.UserName || 'N/A'}
-Telegram Name: @${telegramUser.username || 'No Username'}
-Telegram ID: ${telegramId}
-Mobile: +${user.UserCountryCode}${user.UserMobile}
-Plan: ${user.Instences}
-                `
-            );
-        }
-    }
-
-    return {
-        valid: true,
-        user
-    };
-}
-
-// START
-
-bot.onText(/\/start/, async (msg) => {
-
-    const chatId = msg.chat.id;
-
-    const users = await getUsers();
-
-    const user = users.find(
-        u => u.UserTelegramId === chatId.toString()
-    );
-
-    if (!user) {
-
-        bot.sendMessage(
-            chatId,
-            `
-🚀 OIC Fusion Manager
-
-━━━━━━━━━━━━━━
-
-Please validate your code first.
-
-Example:
-/validate 2365
-
-━━━━━━━━━━━━━━
-            `
-        );
-
-        return;
-    }
-
-    bot.sendMessage(
-        chatId,
-        `
-🚀 Welcome ${user.UserName || 'User'}
-
-━━━━━━━━━━━━━━
-
-📦 Plan
-${user.Instences}
-
-📅 Expiry
-${user.Expiry}
-
-Available Commands
-
-/expiry
-/fusioninstance
-/oicinstance
-/oicsftpdetail
-/atpdetail
-/ftpdetail
-/vbcsdbdetail
-
-━━━━━━━━━━━━━━
-        `
-    );
-});
-
-// VALIDATE
-
-bot.onText(/\/validate (.+)/, async (msg, match) => {
-
-    const chatId = msg.chat.id;
-
-    const code = match[1];
-
-    const result = await validateUser(
-        code,
-        chatId,
-        msg.from
-    );
-
-    if (!result.valid) {
-
-        bot.sendMessage(chatId, result.message);
-
-        return;
-    }
-
-    bot.sendMessage(
-        chatId,
-        `
-✅ CODE VALIDATED
-
-👤 User
-${result.user.UserName}
-
-📦 Plan
-${result.user.Instences}
-
-📅 Expiry
-${result.user.Expiry}
-
-━━━━━━━━━━━━━━
-        `
-    );
-});
-
-// EXPIRY
-
-bot.onText(/\/expiry/, async (msg) => {
-
-    const chatId = msg.chat.id;
-
-    const users = await getUsers();
-
-    const user = users.find(
-        u => u.UserTelegramId === chatId.toString()
-    );
-
-    if (!user) {
-
-        bot.sendMessage(
-            chatId,
-            '❌ VALIDATE YOUR CODE FIRST'
-        );
-
-        return;
-    }
-
-    bot.sendMessage(
-        chatId,
-        `
-📅 SUBSCRIPTION DETAILS
-
-━━━━━━━━━━━━━━
-
-👤 User
-${user.UserName}
-
-📦 Plan
-${user.Instences}
-
-💰 Last Payment
-₹${user.LastPayment}
-
-📅 Expiry
-${user.Expiry}
-
-🔄 Renew Before
-${user.Renew}
-
-🟢 Status
-ACTIVE
-
-━━━━━━━━━━━━━━
-        `
-    );
-});
-
-// LOAD CREDENTIALS
-
-async function getCredentials() {
-
-    const rows = await credentialsSheet.getRows();
-
-    const row = rows[0];
-
-    return {
-        fusion: row.get('Fusion Detail'),
-        oic: row.get('OIC Detail'),
-        sftp: row.get('SFTP Detail'),
-        atp: row.get('ATP Detail'),
-        ftp: row.get('FTP Detail'),
-        vbcs: row.get('VBCS DB Detail')
-    };
-}
-
-async function getCurrentUser(chatId) {
-
-    const users = await getUsers();
-
-    return users.find(
-        u => u.UserTelegramId === chatId.toString()
-    );
-}
-
-// FUSION
-
-bot.onText(/\/fusioninstance/, async (msg) => {
-
-    const chatId = msg.chat.id;
-
-    const user = await getCurrentUser(chatId);
-
-    if (!user) {
-
-        bot.sendMessage(chatId, '❌ ACCESS DENIED');
-
-        return;
-    }
-
-    if (
-        user.Instences !== 'FUSION' &&
-        user.Instences !== 'BOTH'
-    ) {
-
-        bot.sendMessage(
-            chatId,
-            '❌ FUSION ACCESS NOT AVAILABLE'
-        );
-
-        return;
-    }
-
-    const creds = await getCredentials();
-
-    bot.sendMessage(
-        chatId,
-        `🚀 FUSION DETAIL\n\n${creds.fusion}`
-    );
-});
-
-// OIC
-
-bot.onText(/\/oicinstance/, async (msg) => {
-
-    const chatId = msg.chat.id;
-
-    const user = await getCurrentUser(chatId);
-
-    if (!user) {
-
-        bot.sendMessage(chatId, '❌ ACCESS DENIED');
-
-        return;
-    }
-
-    if (
-        user.Instences !== 'OIC' &&
-        user.Instences !== 'BOTH'
-    ) {
-
-        bot.sendMessage(
-            chatId,
-            '❌ OIC ACCESS NOT AVAILABLE'
-        );
-
-        return;
-    }
-
-    const creds = await getCredentials();
-
-    bot.sendMessage(
-        chatId,
-        `🚀 OIC DETAIL\n\n${creds.oic}`
-    );
-});
-
-// SFTP
-
-bot.onText(/\/oicsftpdetail/, async (msg) => {
-
-    const chatId = msg.chat.id;
-
-    const user = await getCurrentUser(chatId);
-
-    if (!user) {
-
-        bot.sendMessage(chatId, '❌ ACCESS DENIED');
-
-        return;
-    }
-
-    if (
-        user.Instences !== 'OIC' &&
-        user.Instences !== 'BOTH'
-    ) {
-
-        bot.sendMessage(
-            chatId,
-            '❌ SFTP ACCESS NOT AVAILABLE'
-        );
-
-        return;
-    }
-
-    const creds = await getCredentials();
-
-    bot.sendMessage(
-        chatId,
-        `🚀 SFTP DETAIL\n\n${creds.sftp}`
-    );
-});
-
-// ATP
-
-bot.onText(/\/atpdetail/, async (msg) => {
-
-    const chatId = msg.chat.id;
-
-    const user = await getCurrentUser(chatId);
-
-    if (!user) {
-
-        bot.sendMessage(chatId, '❌ ACCESS DENIED');
-
-        return;
-    }
-
-    if (
-        user.Instences !== 'OIC' &&
-        user.Instences !== 'BOTH'
-    ) {
-
-        bot.sendMessage(
-            chatId,
-            '❌ ATP ACCESS NOT AVAILABLE'
-        );
-
-        return;
-    }
-
-    const creds = await getCredentials();
-
-    bot.sendMessage(
-        chatId,
-        `🚀 ATP DETAIL\n\n${creds.atp}`
-    );
-});
-
-// FTP
-
-bot.onText(/\/ftpdetail/, async (msg) => {
-
-    const chatId = msg.chat.id;
-
-    const user = await getCurrentUser(chatId);
-
-    if (!user) {
-
-        bot.sendMessage(chatId, '❌ ACCESS DENIED');
-
-        return;
-    }
-
-    if (
-        user.Instences !== 'OIC' &&
-        user.Instences !== 'BOTH'
-    ) {
-
-        bot.sendMessage(
-            chatId,
-            '❌ FTP ACCESS NOT AVAILABLE'
-        );
-
-        return;
-    }
-
-    const creds = await getCredentials();
-
-    bot.sendMessage(
-        chatId,
-        `🚀 FTP DETAIL\n\n${creds.ftp}`
-    );
-});
-
-// VBCS
-
-bot.onText(/\/vbcsdbdetail/, async (msg) => {
-
-    const chatId = msg.chat.id;
-
-    const user = await getCurrentUser(chatId);
-
-    if (!user) {
-
-        bot.sendMessage(chatId, '❌ ACCESS DENIED');
-
-        return;
-    }
-
-    if (
-        user.Instences !== 'OIC' &&
-        user.Instences !== 'BOTH'
-    ) {
-
-        bot.sendMessage(
-            chatId,
-            '❌ VBCS ACCESS NOT AVAILABLE'
-        );
-
-        return;
-    }
-
-    const creds = await getCredentials();
-
-    bot.sendMessage(
-        chatId,
-        `🚀 VBCS DB DETAIL\n\n${creds.vbcs}`
-    );
-});
-
-// COMMAND MENU
+/*
+========================================
+TELEGRAM MENU COMMANDS
+========================================
+*/
 
 bot.setMyCommands([
 
     {
         command: 'start',
-        description: 'Open Main Menu'
+        description: 'Start Bot'
+    },
+
+    {
+        command: 'validate',
+        description: 'Validate Your Code'
     },
 
     {
         command: 'expiry',
-        description: 'Check Subscription'
+        description: 'Check Expiry Date'
     },
 
     {
         command: 'fusioninstance',
-        description: 'Fusion Detail'
+        description: 'Fusion Instance Detail'
     },
 
     {
         command: 'oicinstance',
-        description: 'OIC Detail'
+        description: 'OIC Instance Detail'
     },
 
     {
         command: 'oicsftpdetail',
-        description: 'SFTP Detail'
+        description: 'OIC SFTP Detail'
     },
 
     {
@@ -608,40 +68,700 @@ bot.setMyCommands([
 
 ]);
 
-// APIs
+/*
+========================================
+GOOGLE SHEET CONFIG
+========================================
+*/
+
+const SHEET_ID = '1vY_lDqZSYY39EJXK2WIUwVvD21yPsftfbw8MwoKp3G4';
+
+const serviceAccountAuth = new JWT({
+    email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    scopes: ['https://www.googleapis.com/auth/spreadsheets']
+});
+
+const doc = new GoogleSpreadsheet(
+    SHEET_ID,
+    serviceAccountAuth
+);
+
+/*
+========================================
+LOAD SHEETS
+========================================
+*/
+
+async function loadUsersSheet() {
+
+    await doc.loadInfo();
+
+    return doc.sheetsByTitle['Users'];
+}
+
+async function loadCredentialsSheet() {
+
+    await doc.loadInfo();
+
+    return doc.sheetsByTitle['Credentials'];
+}
+
+/*
+========================================
+VALIDATED USERS
+========================================
+*/
+
+const validatedUsers = {};
+
+/*
+========================================
+CHECK EXPIRY
+========================================
+*/
+
+function isExpired(expiryDate) {
+
+    const months = {
+        Jan: 0,
+        Feb: 1,
+        Mar: 2,
+        Apr: 3,
+        May: 4,
+        Jun: 5,
+        Jul: 6,
+        Aug: 7,
+        Sep: 8,
+        Oct: 9,
+        Nov: 10,
+        Dec: 11
+    };
+
+    const parts = expiryDate.split('-');
+
+    const day = parseInt(parts[0]);
+
+    const month = months[parts[1]];
+
+    const year = parseInt(parts[2]);
+
+    const expiry = new Date(year, month, day);
+
+    const today = new Date();
+
+    expiry.setHours(0,0,0,0);
+
+    today.setHours(0,0,0,0);
+
+    return today > expiry;
+}
+
+/*
+========================================
+GET USER DATA
+========================================
+*/
+
+async function getUserByCode(code) {
+
+    const sheet = await loadUsersSheet();
+
+    const rows = await sheet.getRows();
+
+    const users = rows.map(row => ({
+        Code: String(row.get('Code')).trim(),
+        Paid: row.get('Paid'),
+        Expiry: row.get('Expiry'),
+        Renew: row.get('Renew'),
+        Active: String(row.get('Active')).trim(),
+
+        Instances: String(row.get('Instances'))
+            .trim()
+            .replace(/\s/g, '')
+            .toUpperCase()
+    }));
+
+    return users.find(
+        u => u.Code === code
+    );
+}
+
+/*
+========================================
+GET CREDENTIALS
+========================================
+*/
+
+async function getCredentials() {
+
+    const sheet = await loadCredentialsSheet();
+
+    const rows = await sheet.getRows();
+
+    if(rows.length === 0) {
+        return null;
+    }
+
+    return {
+        fusion: rows[0].get('Fusion Detail'),
+        oic: rows[0].get('OIC Detail'),
+        sftp: rows[0].get('SFTP Detail'),
+        atp: rows[0].get('ATP Detail'),
+        ftp: rows[0].get('FTP Detail'),
+        vbcs: rows[0].get('VBCS DB Detail')
+    };
+}
+
+/*
+========================================
+ACCESS CHECK
+========================================
+*/
+
+function hasFusionAccess(type) {
+
+    return (
+        type === 'FUSION' ||
+        type === 'BOTH'
+    );
+}
+
+function hasOICAccess(type) {
+
+    return (
+        type === 'OIC' ||
+        type === 'BOTH'
+    );
+}
+
+/*
+========================================
+VALID USER CHECK
+========================================
+*/
+
+async function validateUserAccess(chatId) {
+
+    const code = validatedUsers[chatId];
+
+    if(!code) {
+        return {
+            success: false,
+            message:
+`❌ VALIDATE FIRST
+
+/validate CODE`
+        };
+    }
+
+    const user = await getUserByCode(code);
+
+    if(!user) {
+        return {
+            success: false,
+            message: '❌ USER NOT FOUND'
+        };
+    }
+
+    if(
+        user.Active.toUpperCase() !== 'TRUE' ||
+        isExpired(user.Expiry)
+    ) {
+
+        return {
+            success: false,
+            message:
+`⚠️ INSTANCE EXPIRED
+
+━━━━━━━━━━━━━━
+
+Code
+${user.Code}
+
+Expiry Date
+${user.Expiry}
+
+━━━━━━━━━━━━━━
+
+Contact Support
+@KLRAHUL_5646`
+        };
+    }
+
+    return {
+        success: true,
+        user
+    };
+}
+
+/*
+========================================
+START
+========================================
+*/
+
+bot.onText(/^\/start$/, async (msg) => {
+
+    bot.sendMessage(msg.chat.id,
+`🚀 OIC Fusion Manager
+
+━━━━━━━━━━━━━━
+
+AVAILABLE COMMANDS
+
+/validate CODE
+/expiry
+
+/fusioninstance
+/oicinstance
+/oicsftpdetail
+/atpdetail
+/ftpdetail
+/vbcsdbdetail
+
+━━━━━━━━━━━━━━`);
+});
+
+/*
+========================================
+VALIDATE
+========================================
+*/
+
+bot.on('message', async (msg) => {
+
+    try {
+
+        if(!msg.text) return;
+
+        if(!msg.text.startsWith('/validate')) return;
+
+        const parts = msg.text.split(' ');
+
+        if(parts.length < 2) {
+
+            bot.sendMessage(msg.chat.id,
+`❌ INVALID FORMAT
+
+Use:
+/validate CODE`);
+
+            return;
+        }
+
+        const code = parts[1].trim();
+
+        const user = await getUserByCode(code);
+
+        if(!user) {
+
+            bot.sendMessage(msg.chat.id,
+`❌ CODE NOT FOUND`);
+
+            return;
+        }
+
+        if(user.Active.toUpperCase() !== 'TRUE') {
+
+            bot.sendMessage(msg.chat.id,
+`❌ ACCESS DISABLED`);
+
+            return;
+        }
+
+        if(isExpired(user.Expiry)) {
+
+            bot.sendMessage(msg.chat.id,
+`⚠️ INSTANCE EXPIRED
+
+Expiry Date
+${user.Expiry}`);
+
+            return;
+        }
+
+        validatedUsers[msg.chat.id] = user.Code;
+
+        bot.sendMessage(msg.chat.id,
+`✅ BILL VALIDATED
+
+━━━━━━━━━━━━━━
+
+Code
+${user.Code}
+
+Plan
+${user.Instances}
+
+Expiry Date
+${user.Expiry}
+
+Status
+ACTIVE
+
+━━━━━━━━━━━━━━`);
+    }
+
+    catch(error) {
+
+        console.log(error);
+
+        bot.sendMessage(msg.chat.id,
+`❌ ERROR
+
+${error.message}`);
+    }
+});
+
+/*
+========================================
+EXPIRY
+========================================
+*/
+
+bot.onText(/^\/expiry$/, async (msg) => {
+
+    try {
+
+        const result = await validateUserAccess(msg.chat.id);
+
+        if(!result.success) {
+
+            bot.sendMessage(msg.chat.id, result.message);
+
+            return;
+        }
+
+        const user = result.user;
+
+        bot.sendMessage(msg.chat.id,
+`📅 RENEWAL NOTICE
+
+━━━━━━━━━━━━━━
+
+Code
+${user.Code}
+
+Plan
+${user.Instances}
+
+Expiry Date
+${user.Expiry}
+
+Renew Date
+${user.Renew}
+
+━━━━━━━━━━━━━━`);
+    }
+
+    catch(error) {
+
+        console.log(error);
+    }
+});
+
+/*
+========================================
+FUSION INSTANCE
+========================================
+*/
+
+bot.onText(/^\/fusioninstance$/, async (msg) => {
+
+    try {
+
+        const result = await validateUserAccess(msg.chat.id);
+
+        if(!result.success) {
+
+            bot.sendMessage(msg.chat.id, result.message);
+
+            return;
+        }
+
+        const user = result.user;
+
+        if(!hasFusionAccess(user.Instances)) {
+
+            bot.sendMessage(msg.chat.id,
+`❌ FUSION ACCESS NOT AVAILABLE`);
+
+            return;
+        }
+
+        const creds = await getCredentials();
+
+        bot.sendMessage(msg.chat.id,
+`🚀 FUSION INSTANCE DETAIL
+
+━━━━━━━━━━━━━━
+
+${creds.fusion}
+
+━━━━━━━━━━━━━━`);
+    }
+
+    catch(error) {
+
+        console.log(error);
+    }
+});
+
+/*
+========================================
+OIC INSTANCE
+========================================
+*/
+
+bot.onText(/^\/oicinstance$/, async (msg) => {
+
+    try {
+
+        const result = await validateUserAccess(msg.chat.id);
+
+        if(!result.success) {
+
+            bot.sendMessage(msg.chat.id, result.message);
+
+            return;
+        }
+
+        const user = result.user;
+
+        if(!hasOICAccess(user.Instances)) {
+
+            bot.sendMessage(msg.chat.id,
+`❌ OIC ACCESS NOT AVAILABLE`);
+
+            return;
+        }
+
+        const creds = await getCredentials();
+
+        bot.sendMessage(msg.chat.id,
+`☁️ OIC INSTANCE DETAIL
+
+━━━━━━━━━━━━━━
+
+${creds.oic}
+
+━━━━━━━━━━━━━━`);
+    }
+
+    catch(error) {
+
+        console.log(error);
+    }
+});
+
+/*
+========================================
+SFTP DETAIL
+========================================
+*/
+
+bot.onText(/^\/oicsftpdetail$/, async (msg) => {
+
+    try {
+
+        const result = await validateUserAccess(msg.chat.id);
+
+        if(!result.success) {
+
+            bot.sendMessage(msg.chat.id, result.message);
+
+            return;
+        }
+
+        const user = result.user;
+
+        if(!hasOICAccess(user.Instances)) {
+
+            bot.sendMessage(msg.chat.id,
+`❌ OIC ACCESS NOT AVAILABLE`);
+
+            return;
+        }
+
+        const creds = await getCredentials();
+
+        bot.sendMessage(msg.chat.id,
+`📂 SFTP DETAIL
+
+━━━━━━━━━━━━━━
+
+${creds.sftp}
+
+━━━━━━━━━━━━━━`);
+    }
+
+    catch(error) {
+
+        console.log(error);
+    }
+});
+
+/*
+========================================
+ATP DETAIL
+========================================
+*/
+
+bot.onText(/^\/atpdetail$/, async (msg) => {
+
+    try {
+
+        const result = await validateUserAccess(msg.chat.id);
+
+        if(!result.success) {
+
+            bot.sendMessage(msg.chat.id, result.message);
+
+            return;
+        }
+
+        const user = result.user;
+
+        if(!hasOICAccess(user.Instances)) {
+
+            bot.sendMessage(msg.chat.id,
+`❌ OIC ACCESS NOT AVAILABLE`);
+
+            return;
+        }
+
+        const creds = await getCredentials();
+
+        bot.sendMessage(msg.chat.id,
+`🗄 ATP DETAIL
+
+━━━━━━━━━━━━━━
+
+${creds.atp}
+
+━━━━━━━━━━━━━━`);
+    }
+
+    catch(error) {
+
+        console.log(error);
+    }
+});
+
+/*
+========================================
+FTP DETAIL
+========================================
+*/
+
+bot.onText(/^\/ftpdetail$/, async (msg) => {
+
+    try {
+
+        const result = await validateUserAccess(msg.chat.id);
+
+        if(!result.success) {
+
+            bot.sendMessage(msg.chat.id, result.message);
+
+            return;
+        }
+
+        const user = result.user;
+
+        if(!hasOICAccess(user.Instances)) {
+
+            bot.sendMessage(msg.chat.id,
+`❌ OIC ACCESS NOT AVAILABLE`);
+
+            return;
+        }
+
+        const creds = await getCredentials();
+
+        bot.sendMessage(msg.chat.id,
+`📁 FTP DETAIL
+
+━━━━━━━━━━━━━━
+
+${creds.ftp}
+
+━━━━━━━━━━━━━━`);
+    }
+
+    catch(error) {
+
+        console.log(error);
+    }
+});
+
+/*
+========================================
+VBCS DB DETAIL
+========================================
+*/
+
+bot.onText(/^\/vbcsdbdetail$/, async (msg) => {
+
+    try {
+
+        const result = await validateUserAccess(msg.chat.id);
+
+        if(!result.success) {
+
+            bot.sendMessage(msg.chat.id, result.message);
+
+            return;
+        }
+
+        const user = result.user;
+
+        if(!hasOICAccess(user.Instances)) {
+
+            bot.sendMessage(msg.chat.id,
+`❌ OIC ACCESS NOT AVAILABLE`);
+
+            return;
+        }
+
+        const creds = await getCredentials();
+
+        bot.sendMessage(msg.chat.id,
+`🗃 VBCS DB DETAIL
+
+━━━━━━━━━━━━━━
+
+${creds.vbcs}
+
+━━━━━━━━━━━━━━`);
+    }
+
+    catch(error) {
+
+        console.log(error);
+    }
+});
+
+/*
+========================================
+ROOT
+========================================
+*/
 
 app.get('/', (req, res) => {
 
     res.send('Bot Running...');
 });
 
-app.get('/health', (req, res) => {
-
-    res.status(200).send('OK');
-});
-
-app.get('/users', async (req, res) => {
-
-    const users = await getUsers();
-
-    res.json(users);
-});
-
-// KEEP ALIVE LOG
-
-setInterval(() => {
-
-    console.log('Bot Alive:', new Date());
-
-}, 60000);
-
-// SERVER
-
-const PORT = process.env.PORT || 10000;
+/*
+========================================
+START SERVER
+========================================
+*/
 
 app.listen(PORT, () => {
 
+    console.log('Bot Running...');
     console.log(`Server running on port ${PORT}`);
 });
-
-console.log('Bot Running...');
