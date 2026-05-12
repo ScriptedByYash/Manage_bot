@@ -411,6 +411,46 @@ ${user.Expiry}`);
             return;
         }
 
+        /*
+        ========================================
+        ADMIN ALERT
+        ========================================
+        */
+
+        if(process.env.ADMIN_ID) {
+
+            bot.sendMessage(
+                process.env.ADMIN_ID,
+
+`🚨 NEW USER VALIDATION
+
+━━━━━━━━━━━━━━
+
+👤 User
+${user.UserName || 'N/A'}
+
+🔑 Code
+${user.Code}
+
+📦 Plan
+${user.Instances}
+
+📱 Telegram ID
+${msg.from.id}
+
+🧑 Username
+@${msg.from.username || 'N/A'}
+
+🌍 Country Code
+${user.UserCountryCode || 'N/A'}
+
+📞 Mobile
+${user.UserMobile || 'N/A'}
+
+━━━━━━━━━━━━━━`
+            );
+        }
+
         validatedUsers[msg.chat.id] = user.Code;
 
         bot.sendMessage(msg.chat.id,
