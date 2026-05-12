@@ -33,7 +33,7 @@ bot.setMyCommands([
 
     {
         command: 'expiry',
-        description: 'Check Expiry Date'
+        description: 'Check Subscription'
     },
 
     {
@@ -171,10 +171,24 @@ async function getUserByCode(code) {
 
     const users = rows.map(row => ({
         Code: String(row.get('Code')).trim(),
+
         Paid: row.get('Paid'),
+
         Expiry: row.get('Expiry'),
+
         Renew: row.get('Renew'),
+
         Active: String(row.get('Active')).trim(),
+
+        LastPayment: row.get('Last payment'),
+
+        UserName: row.get('User Name'),
+
+        UserCountryCode: row.get('User Country Code'),
+
+        UserMobile: row.get('User Mobile'),
+
+        UserTelegramId: row.get('User Telegram Id'),
 
         Instances: String(row.get('Instances'))
             .trim()
@@ -303,8 +317,24 @@ START
 
 bot.onText(/^\/start$/, async (msg) => {
 
-    bot.sendMessage(msg.chat.id,
-`🚀 OIC Fusion Manager
+    const chatId = msg.chat.id;
+
+    let userName = 'User';
+
+    const code = validatedUsers[chatId];
+
+    if(code) {
+
+        const user = await getUserByCode(code);
+
+        if(user && user.UserName) {
+
+            userName = user.UserName;
+        }
+    }
+
+    bot.sendMessage(chatId,
+`🚀 Welcome ${userName}
 
 ━━━━━━━━━━━━━━
 
@@ -388,16 +418,19 @@ ${user.Expiry}`);
 
 ━━━━━━━━━━━━━━
 
+👤 User
+${user.UserName || 'N/A'}
+
 Code
 ${user.Code}
 
 Plan
 ${user.Instances}
 
-Expiry Date
+📅 Expiry
 ${user.Expiry}
 
-Status
+🟢 Status
 ACTIVE
 
 ━━━━━━━━━━━━━━`);
@@ -436,21 +469,27 @@ bot.onText(/^\/expiry$/, async (msg) => {
         const user = result.user;
 
         bot.sendMessage(msg.chat.id,
-`📅 RENEWAL NOTICE
+`📅 SUBSCRIPTION DETAILS
 
 ━━━━━━━━━━━━━━
 
-Code
-${user.Code}
+👤 User
+${user.UserName || 'N/A'}
 
-Plan
+📦 Plan
 ${user.Instances}
 
-Expiry Date
+💰 Last Payment
+${user.LastPayment || 'N/A'}
+
+📅 Expiry
 ${user.Expiry}
 
-Renew Date
+🔄 Renew Before
 ${user.Renew}
+
+🟢 Status
+ACTIVE
 
 ━━━━━━━━━━━━━━`);
     }
@@ -754,6 +793,11 @@ app.get('/', (req, res) => {
     res.send('Bot Running...');
 });
 
+app.get('/health', (req, res) => {
+
+    res.status(200).send('OK');
+});
+
 /*
 ========================================
 START SERVER
@@ -765,3 +809,5 @@ app.listen(PORT, () => {
     console.log('Bot Running...');
     console.log(`Server running on port ${PORT}`);
 });
+
+console.log('Bot Running...');
