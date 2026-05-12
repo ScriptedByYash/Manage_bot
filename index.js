@@ -369,9 +369,9 @@ bot.onText(/^\/start$/, async (msg) => {
     if(!user) {
 
         bot.sendMessage(msg.chat.id,
-`╔════════════════════════╗
+`╔═══════════════════════╗
 🚀 Oracle Instance Provider 🚀
-╚════════════════════════╝
+╚═══════════════════════╝
 
 Welcome to 🚀 Oracle Instance Provider 🚀
 
@@ -383,7 +383,7 @@ Example:
 👨‍💼 Support
 /admincontact
 
-──────────────────────────
+────────────────────────
 
 ⚡ Fast Access | 🔒 Secure Details | 📞 24×7 Support`);
 
@@ -391,9 +391,9 @@ Example:
     }
 
     bot.sendMessage(msg.chat.id,
-`╔════════════════════════╗
+`╔═══════════════════════╗
 🚀 Oracle Instance Provider 🚀
-╚════════════════════════╝
+╚═══════════════════════╝
 
 Welcome to 🚀 Oracle Instance Provider 🚀
 
@@ -401,7 +401,7 @@ Hello ${user.UserName || 'User'}!
 I provide high-speed access to Oracle Fusion and OIC instances, including SFTP & ATP details.
 
 📋 COMMANDS
-──────────────────────────
+────────────────────────
 
 📅 /expiry
   (Check Expiry Date)
@@ -430,7 +430,7 @@ I provide high-speed access to Oracle Fusion and OIC instances, including SFTP &
 🗃 /vbcsdbdetail
   (VBCS Database Details)
 
-──────────────────────────
+────────────────────────
 
 ⚡ Fast Access | 🔒 Secure Details | 📞 24×7 Support`);
 });
