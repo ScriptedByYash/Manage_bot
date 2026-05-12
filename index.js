@@ -683,9 +683,6 @@ CONTACT ADMIN
 Telegram
 @KLRAHUL_5646
 
-WhatsApp
-+919302613759
-
 ━━━━━━━━━━━━━━`);
     }
 
