@@ -369,9 +369,9 @@ bot.onText(/^\/start$/, async (msg) => {
     if(!user) {
 
         bot.sendMessage(msg.chat.id,
-`╔═══════════════════════╗
+`╔═════════════════════╗
 🚀 Oracle Instance Provider 🚀
-╚═══════════════════════╝
+╚═════════════════════╝
 
 Welcome to 🚀 Oracle Instance Provider 🚀
 
@@ -391,9 +391,9 @@ Example:
     }
 
     bot.sendMessage(msg.chat.id,
-`╔═══════════════════════╗
+`╔═════════════════════╗
 🚀 Oracle Instance Provider 🚀
-╚═══════════════════════╝
+╚═════════════════════╝
 
 Welcome to 🚀 Oracle Instance Provider 🚀
 
