@@ -188,7 +188,9 @@ async function getUserByCode(code) {
 
         UserMobile: row.get('User Mobile'),
 
-        UserTelegramId: row.get('User Telegram Id'),
+        UserTelegramId: String(
+            row.get('User Telegram Id') || ''
+        ).trim(),
 
         Instances: String(row.get('Instances'))
             .trim()
@@ -198,6 +200,52 @@ async function getUserByCode(code) {
 
     return users.find(
         u => u.Code === code
+    );
+}
+
+/*
+========================================
+GET USER BY TELEGRAM ID
+========================================
+*/
+
+async function getUserByTelegramId(chatId) {
+
+    const sheet = await loadUsersSheet();
+
+    const rows = await sheet.getRows();
+
+    const users = rows.map(row => ({
+        Code: String(row.get('Code')).trim(),
+
+        Paid: row.get('Paid'),
+
+        Expiry: row.get('Expiry'),
+
+        Renew: row.get('Renew'),
+
+        Active: String(row.get('Active')).trim(),
+
+        LastPayment: row.get('Last payment'),
+
+        UserName: row.get('User Name'),
+
+        UserCountryCode: row.get('User Country Code'),
+
+        UserMobile: row.get('User Mobile'),
+
+        UserTelegramId: String(
+            row.get('User Telegram Id') || ''
+        ).trim(),
+
+        Instances: String(row.get('Instances'))
+            .trim()
+            .replace(/\s/g, '')
+            .toUpperCase()
+    }));
+
+    return users.find(
+        u => u.UserTelegramId === chatId.toString()
     );
 }
 
@@ -257,24 +305,16 @@ VALID USER CHECK
 
 async function validateUserAccess(chatId) {
 
-    const code = validatedUsers[chatId];
+    const user = await getUserByTelegramId(chatId);
 
-    if(!code) {
+    if(!user) {
+
         return {
             success: false,
             message:
 `❌ VALIDATE FIRST
 
 /validate CODE`
-        };
-    }
-
-    const user = await getUserByCode(code);
-
-    if(!user) {
-        return {
-            success: false,
-            message: '❌ USER NOT FOUND'
         };
     }
 
@@ -317,30 +357,40 @@ START
 
 bot.onText(/^\/start$/, async (msg) => {
 
-    const chatId = msg.chat.id;
+    const chatId = msg.chat.id.toString();
 
-    let userName = 'User';
+    const user = await getUserByTelegramId(chatId);
 
-    const code = validatedUsers[chatId];
+    if(!user) {
 
-    if(code) {
-
-        const user = await getUserByCode(code);
-
-        if(user && user.UserName) {
-
-            userName = user.UserName;
-        }
-    }
-
-    bot.sendMessage(chatId,
-`🚀 Welcome ${userName}
+        bot.sendMessage(msg.chat.id,
+`🚀 OIC Fusion Manager
 
 ━━━━━━━━━━━━━━
 
+Please validate your code first.
+
+Example:
+/validate 2366
+
+━━━━━━━━━━━━━━`);
+
+        return;
+    }
+
+    bot.sendMessage(msg.chat.id,
+`🚀 Welcome ${user.UserName || 'User'}
+
+━━━━━━━━━━━━━━
+
+📦 Plan
+${user.Instances}
+
+📅 Expiry
+${user.Expiry}
+
 AVAILABLE COMMANDS
 
-/validate CODE
 /expiry
 
 /fusioninstance
@@ -413,11 +463,34 @@ ${user.Expiry}`);
 
         /*
         ========================================
-        ADMIN ALERT
+        TELEGRAM ID SECURITY
         ========================================
         */
 
-        if(process.env.ADMIN_ID) {
+        if(
+            user.UserTelegramId &&
+            user.UserTelegramId !== msg.chat.id.toString()
+        ) {
+
+            bot.sendMessage(msg.chat.id,
+`❌ THIS CODE IS ALREADY LINKED TO ANOTHER TELEGRAM ACCOUNT`);
+
+            return;
+        }
+
+        /*
+        ========================================
+        ADMIN APPROVAL ONLY IF TELEGRAM ID EMPTY
+        ========================================
+        */
+
+        if(
+            process.env.ADMIN_ID &&
+            (
+                !user.UserTelegramId ||
+                user.UserTelegramId.trim() === ''
+            )
+        ) {
 
             bot.sendMessage(
                 process.env.ADMIN_ID,
