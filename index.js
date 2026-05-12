@@ -42,6 +42,11 @@ bot.setMyCommands([
     },
 
     {
+        command: 'admincontact',
+        description: 'Contact Admin'
+    },
+
+    {
         command: 'fusioninstance',
         description: 'Fusion Instance Detail'
     },
@@ -311,7 +316,10 @@ async function validateUserAccess(chatId) {
             message:
 `❌ VALIDATE FIRST
 
-/validate CODE`
+/validate CODE
+
+Need Help?
+/admincontact`
         };
     }
 
@@ -335,8 +343,8 @@ ${user.Expiry}
 
 ━━━━━━━━━━━━━━
 
-Contact Support
-@KLRAHUL_5646`
+Need Help?
+/admincontact`
         };
     }
 
@@ -370,6 +378,9 @@ Please validate your code first.
 Example:
 /validate 2366
 
+Need Help?
+/admincontact
+
 ━━━━━━━━━━━━━━`);
 
         return;
@@ -393,6 +404,7 @@ AVAILABLE COMMANDS
 
 /expiry
 /renew
+/admincontact
 
 /fusioninstance
 /oicinstance
@@ -426,7 +438,10 @@ bot.on('message', async (msg) => {
 `❌ INVALID FORMAT
 
 Use:
-/validate CODE`);
+/validate CODE
+
+Need Help?
+/admincontact`);
 
             return;
         }
@@ -438,7 +453,10 @@ Use:
         if(!user) {
 
             bot.sendMessage(msg.chat.id,
-`❌ CODE NOT FOUND`);
+`❌ CODE NOT FOUND
+
+Need Help?
+/admincontact`);
 
             return;
         }
@@ -446,7 +464,10 @@ Use:
         if(user.Active.toUpperCase() !== 'TRUE') {
 
             bot.sendMessage(msg.chat.id,
-`❌ ACCESS DISABLED`);
+`❌ ACCESS DISABLED
+
+Need Help?
+/admincontact`);
 
             return;
         }
@@ -457,7 +478,10 @@ Use:
 `⚠️ INSTANCE EXPIRED
 
 Expiry Date
-${user.Expiry}`);
+${user.Expiry}
+
+Need Help?
+/admincontact`);
 
             return;
         }
@@ -474,7 +498,10 @@ ${user.Expiry}`);
         ) {
 
             bot.sendMessage(msg.chat.id,
-`❌ THIS CODE IS ALREADY LINKED TO ANOTHER TELEGRAM ACCOUNT`);
+`❌ THIS CODE IS ALREADY LINKED TO ANOTHER TELEGRAM ACCOUNT
+
+Need Help?
+/admincontact`);
 
             return;
         }
@@ -536,6 +563,9 @@ Please wait for approval.
 Approx Time
 5 Minutes
 
+Need Help?
+/admincontact
+
 ━━━━━━━━━━━━━━`);
 
             return;
@@ -555,10 +585,10 @@ Approx Time
 👤 User
 ${user.UserName || 'N/A'}
 
-Code
+🔑 Code
 ${user.Code}
 
-Plan
+📦 Plan
 ${user.Instances}
 
 📅 Expiry
@@ -566,6 +596,9 @@ ${user.Expiry}
 
 🟢 Status
 ACTIVE
+
+Need Help?
+/admincontact
 
 ━━━━━━━━━━━━━━`);
 
@@ -578,8 +611,39 @@ ACTIVE
         bot.sendMessage(msg.chat.id,
 `❌ ERROR
 
-${error.message}`);
+${error.message}
+
+Need Help?
+/admincontact`);
     }
+});
+
+/*
+========================================
+ADMIN CONTACT
+========================================
+*/
+
+bot.onText(/^\/admincontact$/, async (msg) => {
+
+    bot.sendMessage(msg.chat.id,
+`👨‍💻 ADMIN CONTACT
+
+━━━━━━━━━━━━━━
+
+Telegram
+@KLRAHUL_5646
+
+━━━━━━━━━━━━━━
+
+For:
+• Renewal
+• Login Issues
+• Expiry Issues
+• Access Problems
+• Technical Support
+
+━━━━━━━━━━━━━━`);
 });
 
 /*
@@ -628,6 +692,9 @@ ${user.Renew}
 
 🟢 Status
 ACTIVE
+
+Need Help?
+/admincontact
 
 ━━━━━━━━━━━━━━`);
     }
@@ -716,7 +783,10 @@ bot.onText(/^\/fusioninstance$/, async (msg) => {
         if(!hasFusionAccess(user.Instances)) {
 
             bot.sendMessage(msg.chat.id,
-`❌ FUSION ACCESS NOT AVAILABLE`);
+`❌ FUSION ACCESS NOT AVAILABLE
+
+Need Help?
+/admincontact`);
 
             return;
         }
@@ -730,7 +800,10 @@ bot.onText(/^\/fusioninstance$/, async (msg) => {
 
 ${creds.fusion}
 
-━━━━━━━━━━━━━━`);
+━━━━━━━━━━━━━━
+
+Need Help?
+/admincontact`);
     }
 
     catch(error) {
@@ -763,7 +836,10 @@ bot.onText(/^\/oicinstance$/, async (msg) => {
         if(!hasOICAccess(user.Instances)) {
 
             bot.sendMessage(msg.chat.id,
-`❌ OIC ACCESS NOT AVAILABLE`);
+`❌ OIC ACCESS NOT AVAILABLE
+
+Need Help?
+/admincontact`);
 
             return;
         }
@@ -777,7 +853,10 @@ bot.onText(/^\/oicinstance$/, async (msg) => {
 
 ${creds.oic}
 
-━━━━━━━━━━━━━━`);
+━━━━━━━━━━━━━━
+
+Need Help?
+/admincontact`);
     }
 
     catch(error) {
@@ -810,7 +889,10 @@ bot.onText(/^\/oicsftpdetail$/, async (msg) => {
         if(!hasOICAccess(user.Instances)) {
 
             bot.sendMessage(msg.chat.id,
-`❌ OIC ACCESS NOT AVAILABLE`);
+`❌ OIC ACCESS NOT AVAILABLE
+
+Need Help?
+/admincontact`);
 
             return;
         }
@@ -824,7 +906,10 @@ bot.onText(/^\/oicsftpdetail$/, async (msg) => {
 
 ${creds.sftp}
 
-━━━━━━━━━━━━━━`);
+━━━━━━━━━━━━━━
+
+Need Help?
+/admincontact`);
     }
 
     catch(error) {
@@ -857,7 +942,10 @@ bot.onText(/^\/atpdetail$/, async (msg) => {
         if(!hasOICAccess(user.Instances)) {
 
             bot.sendMessage(msg.chat.id,
-`❌ OIC ACCESS NOT AVAILABLE`);
+`❌ OIC ACCESS NOT AVAILABLE
+
+Need Help?
+/admincontact`);
 
             return;
         }
@@ -871,7 +959,10 @@ bot.onText(/^\/atpdetail$/, async (msg) => {
 
 ${creds.atp}
 
-━━━━━━━━━━━━━━`);
+━━━━━━━━━━━━━━
+
+Need Help?
+/admincontact`);
     }
 
     catch(error) {
@@ -904,7 +995,10 @@ bot.onText(/^\/ftpdetail$/, async (msg) => {
         if(!hasOICAccess(user.Instances)) {
 
             bot.sendMessage(msg.chat.id,
-`❌ OIC ACCESS NOT AVAILABLE`);
+`❌ OIC ACCESS NOT AVAILABLE
+
+Need Help?
+/admincontact`);
 
             return;
         }
@@ -918,7 +1012,10 @@ bot.onText(/^\/ftpdetail$/, async (msg) => {
 
 ${creds.ftp}
 
-━━━━━━━━━━━━━━`);
+━━━━━━━━━━━━━━
+
+Need Help?
+/admincontact`);
     }
 
     catch(error) {
@@ -951,7 +1048,10 @@ bot.onText(/^\/vbcsdbdetail$/, async (msg) => {
         if(!hasOICAccess(user.Instances)) {
 
             bot.sendMessage(msg.chat.id,
-`❌ OIC ACCESS NOT AVAILABLE`);
+`❌ OIC ACCESS NOT AVAILABLE
+
+Need Help?
+/admincontact`);
 
             return;
         }
@@ -965,7 +1065,10 @@ bot.onText(/^\/vbcsdbdetail$/, async (msg) => {
 
 ${creds.vbcs}
 
-━━━━━━━━━━━━━━`);
+━━━━━━━━━━━━━━
+
+Need Help?
+/admincontact`);
     }
 
     catch(error) {
