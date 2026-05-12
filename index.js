@@ -37,6 +37,11 @@ bot.setMyCommands([
     },
 
     {
+        command: 'renew',
+        description: 'Renew Subscription'
+    },
+
+    {
         command: 'fusioninstance',
         description: 'Fusion Instance Detail'
     },
@@ -374,6 +379,7 @@ Example:
 `🚀 Welcome ${user.UserName || 'User'}
 
 ━━━━━━━━━━━━━━
+
 🔑 Code
 ${user.Code}
 
@@ -386,6 +392,7 @@ ${user.Expiry}
 AVAILABLE COMMANDS
 
 /expiry
+/renew
 
 /fusioninstance
 /oicinstance
@@ -483,10 +490,6 @@ ${user.Expiry}`);
             user.UserTelegramId.trim() === ''
         ) {
 
-            /*
-            ADMIN ALERT
-            */
-
             if(process.env.ADMIN_ID) {
 
                 bot.sendMessage(
@@ -520,10 +523,6 @@ ${user.UserMobile || 'N/A'}
 ━━━━━━━━━━━━━━`
                 );
             }
-
-            /*
-            WAIT MESSAGE
-            */
 
             bot.sendMessage(msg.chat.id,
 `⏳ REQUEST SUBMITTED
@@ -629,6 +628,63 @@ ${user.Renew}
 
 🟢 Status
 ACTIVE
+
+━━━━━━━━━━━━━━`);
+    }
+
+    catch(error) {
+
+        console.log(error);
+    }
+});
+
+/*
+========================================
+RENEW
+========================================
+*/
+
+bot.onText(/^\/renew$/, async (msg) => {
+
+    try {
+
+        const result = await validateUserAccess(msg.chat.id);
+
+        if(!result.success) {
+
+            bot.sendMessage(msg.chat.id, result.message);
+
+            return;
+        }
+
+        const user = result.user;
+
+        bot.sendMessage(msg.chat.id,
+`💳 RENEW SUBSCRIPTION
+
+━━━━━━━━━━━━━━
+
+👤 User
+${user.UserName || 'N/A'}
+
+🔑 Code
+${user.Code}
+
+📦 Plan
+${user.Instances}
+
+📅 Expiry
+${user.Expiry}
+
+━━━━━━━━━━━━━━
+
+CONTACT ADMIN
+
+Telegram
+@KLRAHUL_5646
+
+WhatsApp
++919302613759
 
 ━━━━━━━━━━━━━━`);
     }
