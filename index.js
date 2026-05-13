@@ -15,6 +15,14 @@ const bot = new TelegramBot(token, {
 
 /*
 ========================================
+ADMIN SESSION STORAGE
+========================================
+*/
+
+const adminSessions = {};
+
+/*
+========================================
 TELEGRAM MENU COMMANDS
 ========================================
 */
@@ -74,6 +82,16 @@ bot.setMyCommands([
     {
         command: 'vbcsdbdetail',
         description: 'VBCS DB Detail'
+    },
+
+    {
+    command: 'createuser',
+    description: 'Create New User'
+    },
+
+    {
+    command: 'updateuser',
+    description: 'Update User'
     }
 
 ]);
@@ -368,6 +386,20 @@ function hasOICAccess(type) {
 
 /*
 ========================================
+ADMIN CHECK
+========================================
+*/
+
+function isAdmin(userId) {
+
+    return (
+        userId.toString() ===
+        process.env.ADMIN_ID
+    );
+}
+
+/*
+========================================
 VALID USER CHECK
 ========================================
 */
@@ -420,6 +452,54 @@ Need Help?
         user
     };
 }
+
+/*
+========================================
+CREATE USER
+========================================
+*/
+
+bot.onText(/^\/createuser$/, async (msg) => {
+
+    try {
+
+        if(!isAdmin(msg.from.id)) {
+
+            bot.sendMessage(
+                msg.chat.id,
+                'Unauthorized'
+            );
+
+            return;
+        }
+
+        adminSessions[msg.chat.id] = {
+
+            action: 'create_user',
+
+            step: 'name',
+
+            data: {}
+        };
+
+        bot.sendMessage(
+            msg.chat.id,
+
+`👤 CREATE USER
+
+━━━━━━━━━━━━━━
+
+Enter User Name:
+`
+        );
+
+    }
+
+    catch(error) {
+
+        console.log(error);
+    }
+});
 
 /*
 ========================================
