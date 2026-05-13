@@ -685,6 +685,84 @@ if(session.step === 'expiry') {
 
     session.data.expiry = msg.text;
 
+    session.step = 'payment';
+
+    bot.sendMessage(
+        msg.chat.id,
+
+`💰 ENTER LAST PAYMENT
+
+━━━━━━━━━━━━━━
+
+Example:
+500`
+    );
+
+    return;
+}
+
+/*
+========================================
+LAST PAYMENT
+========================================
+*/
+
+if(session.step === 'payment') {
+
+    session.data.payment = msg.text;
+
+    session.step = 'country_code';
+
+    bot.sendMessage(
+        msg.chat.id,
+
+`🌍 ENTER COUNTRY CODE
+
+━━━━━━━━━━━━━━
+
+Example:
+91`
+    );
+
+    return;
+}
+
+/*
+========================================
+COUNTRY CODE
+========================================
+*/
+
+if(session.step === 'country_code') {
+
+    session.data.countryCode = msg.text;
+
+    session.step = 'mobile';
+
+    bot.sendMessage(
+        msg.chat.id,
+
+`📞 ENTER MOBILE NUMBER
+
+━━━━━━━━━━━━━━
+
+Example:
+9876543210`
+    );
+
+    return;
+}
+
+/*
+========================================
+MOBILE NUMBER
+========================================
+*/
+
+if(session.step === 'mobile') {
+
+    session.data.mobile = msg.text;
+
     /*
     ========================================
     GENERATE UNIQUE CODE
@@ -781,14 +859,17 @@ if(session.step === 'expiry') {
 
         Instances: session.data.plan,
 
-        'Last payment': '',
+        'Last payment':
+        session.data.payment,
 
         'User Name':
         session.data.userName,
 
-        'User Country Code': '',
+        'User Country Code':
+        session.data.countryCode,
 
-        'User Mobile': '',
+        'User Mobile':
+        session.data.mobile,
 
         'User Telegram Id': ''
     });
@@ -814,6 +895,13 @@ ${code}
 
 📦 Plan
 ${session.data.plan}
+
+💰 Payment
+${session.data.payment}
+
+📞 Mobile
++${session.data.countryCode}
+${session.data.mobile}
 
 📅 Expiry
 ${session.data.expiry}
