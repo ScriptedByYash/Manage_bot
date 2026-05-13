@@ -594,7 +594,17 @@ bot.on('message', async (msg) => {
 
         if(!msg.text) return;
 
-        if(!msg.text.startsWith('/validate')) return;
+/*
+========================================
+IGNORE ADMIN SESSIONS
+========================================
+*/
+
+if(adminSessions[msg.chat.id]) {
+    return;
+}
+
+if(!msg.text.startsWith('/validate')) return;
 
         const parts = msg.text.split(' ');
 
