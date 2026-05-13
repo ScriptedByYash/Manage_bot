@@ -538,8 +538,8 @@ Need Help?
 
             if(process.env.ADMIN_ID) {
 
-                bot.sendMessage(
-                    process.env.ADMIN_ID,
+    bot.sendMessage(
+        process.env.ADMIN_ID,
 
 `🚨 NEW USER VALIDATION
 
@@ -566,9 +566,27 @@ ${user.UserCountryCode || 'N/A'}
 📞 Mobile
 ${user.UserMobile || 'N/A'}
 
-━━━━━━━━━━━━━━`
-                );
-            }
+━━━━━━━━━━━━━━`,
+
+{
+    reply_markup: {
+        inline_keyboard: [
+            [
+                {
+                    text: '✅ Approve',
+                    callback_data:
+                    `approve_${user.Code}_${msg.from.id}`
+                },
+                {
+                    text: '❌ Reject',
+                    callback_data:
+                    `reject_${user.Code}_${msg.from.id}`
+                }
+            ]
+        ]
+    }
+});
+}
 
             bot.sendMessage(msg.chat.id,
 `⏳ REQUEST SUBMITTED
@@ -634,6 +652,69 @@ ${error.message}
 
 Need Help?
 /admincontact`);
+    }
+});
+
+/*
+========================================
+CALLBACK TEST
+========================================
+*/
+
+bot.on('callback_query', async (query) => {
+
+    try {
+
+        /*
+        ========================================
+        ADMIN SECURITY
+        ========================================
+        */
+
+        if(
+            query.from.id.toString() !==
+            process.env.ADMIN_ID
+        ) {
+
+            bot.answerCallbackQuery(
+                query.id,
+                {
+                    text: 'Unauthorized'
+                }
+            );
+
+            return;
+        }
+
+        /*
+        ========================================
+        LOG CALLBACK
+        ========================================
+        */
+
+        console.log(
+            'CALLBACK DATA:',
+            query.data
+        );
+
+        /*
+        ========================================
+        SUCCESS POPUP
+        ========================================
+        */
+
+        bot.answerCallbackQuery(
+            query.id,
+            {
+                text: 'Button Working'
+            }
+        );
+
+    }
+
+    catch(error) {
+
+        console.log(error);
     }
 });
 
