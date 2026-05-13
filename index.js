@@ -584,6 +584,141 @@ I provide high-speed access to Oracle Fusion and OIC instances, including SFTP &
 
 /*
 ========================================
+ADMIN CREATE USER FLOW
+========================================
+*/
+
+bot.on('message', async (msg) => {
+
+    try {
+
+        if(!msg.text) return;
+
+        if(!isAdmin(msg.from.id)) return;
+
+        const session = adminSessions[msg.chat.id];
+
+        if(!session) return;
+
+        if(session.action !== 'create_user') return;
+
+        /*
+        ========================================
+        USER NAME
+        ========================================
+        */
+
+        if(session.step === 'name') {
+
+            session.data.userName = msg.text;
+
+            session.step = 'plan';
+
+            bot.sendMessage(
+                msg.chat.id,
+
+`📦 SELECT PLAN
+
+━━━━━━━━━━━━━━
+
+Send Any One:
+
+OIC
+FUSION
+BOTH`
+            );
+
+            return;
+        }
+
+        /*
+        ========================================
+        PLAN
+        ========================================
+        */
+
+        if(session.step === 'plan') {
+
+            const plan = msg.text
+                .trim()
+                .toUpperCase();
+
+            if(
+                plan !== 'OIC' &&
+                plan !== 'FUSION' &&
+                plan !== 'BOTH'
+            ) {
+
+                bot.sendMessage(
+                    msg.chat.id,
+                    'Invalid Plan'
+                );
+
+                return;
+            }
+
+            session.data.plan = plan;
+
+            session.step = 'expiry';
+
+            bot.sendMessage(
+                msg.chat.id,
+
+`📅 ENTER EXPIRY DATE
+
+━━━━━━━━━━━━━━
+
+Example:
+15-Jun-2026`
+            );
+
+            return;
+        }
+
+        /*
+        ========================================
+        EXPIRY DATE
+        ========================================
+        */
+
+        if(session.step === 'expiry') {
+
+            session.data.expiry = msg.text;
+
+            bot.sendMessage(
+                msg.chat.id,
+
+`✅ TEST FLOW WORKING
+
+━━━━━━━━━━━━━━
+
+👤 User
+${session.data.userName}
+
+📦 Plan
+${session.data.plan}
+
+📅 Expiry
+${session.data.expiry}
+
+━━━━━━━━━━━━━━`
+            );
+
+            delete adminSessions[msg.chat.id];
+
+            return;
+        }
+
+    }
+
+    catch(error) {
+
+        console.log(error);
+    }
+});
+
+/*
+========================================
 VALIDATE
 ========================================
 */
