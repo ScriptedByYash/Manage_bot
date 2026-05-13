@@ -676,24 +676,141 @@ Example:
         }
 
         /*
-        ========================================
-        EXPIRY DATE
-        ========================================
-        */
+========================================
+EXPIRY DATE
+========================================
+*/
 
-        if(session.step === 'expiry') {
+if(session.step === 'expiry') {
 
-            session.data.expiry = msg.text;
+    session.data.expiry = msg.text;
 
-            bot.sendMessage(
-                msg.chat.id,
+    /*
+    ========================================
+    GENERATE UNIQUE CODE
+    ========================================
+    */
 
-`✅ TEST FLOW WORKING
+    const code = Math.floor(
+        100000 + Math.random() * 900000
+    ).toString();
+
+    /*
+    ========================================
+    TODAY DATE
+    ========================================
+    */
+
+    const today = new Date();
+
+    const paidDate = today
+        .toLocaleDateString(
+            'en-GB',
+            {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+            }
+        )
+        .replace(/ /g, '-');
+
+    /*
+    ========================================
+    RENEW DATE
+    ========================================
+    */
+
+    const expiryParts =
+    session.data.expiry.split('-');
+
+    const months = {
+        Jan: 0,
+        Feb: 1,
+        Mar: 2,
+        Apr: 3,
+        May: 4,
+        Jun: 5,
+        Jul: 6,
+        Aug: 7,
+        Sep: 8,
+        Oct: 9,
+        Nov: 10,
+        Dec: 11
+    };
+
+    const expiryDate = new Date(
+        parseInt(expiryParts[2]),
+        months[expiryParts[1]],
+        parseInt(expiryParts[0])
+    );
+
+    expiryDate.setDate(
+        expiryDate.getDate() - 5
+    );
+
+    const renewDate = expiryDate
+        .toLocaleDateString(
+            'en-GB',
+            {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+            }
+        )
+        .replace(/ /g, '-');
+
+    /*
+    ========================================
+    INSERT GOOGLE SHEET ROW
+    ========================================
+    */
+
+    const sheet = await loadUsersSheet();
+
+    await sheet.addRow({
+
+        Code: code,
+
+        Paid: paidDate,
+
+        Expiry: session.data.expiry,
+
+        Renew: renewDate,
+
+        Active: 'TRUE',
+
+        Instances: session.data.plan,
+
+        'Last payment': '',
+
+        'User Name':
+        session.data.userName,
+
+        'User Country Code': '',
+
+        'User Mobile': '',
+
+        'User Telegram Id': ''
+    });
+
+    /*
+    ========================================
+    SUCCESS MESSAGE
+    ========================================
+    */
+
+    bot.sendMessage(
+        msg.chat.id,
+
+`✅ USER CREATED
 
 ━━━━━━━━━━━━━━
 
 👤 User
 ${session.data.userName}
+
+🔑 Code
+${code}
 
 📦 Plan
 ${session.data.plan}
@@ -701,13 +818,22 @@ ${session.data.plan}
 📅 Expiry
 ${session.data.expiry}
 
+📅 Renew
+${renewDate}
+
 ━━━━━━━━━━━━━━`
-            );
+    );
 
-            delete adminSessions[msg.chat.id];
+    /*
+    ========================================
+    CLEAR SESSION
+    ========================================
+    */
 
-            return;
-        }
+    delete adminSessions[msg.chat.id];
+
+    return;
+}
 
     }
 
