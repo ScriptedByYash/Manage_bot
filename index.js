@@ -119,6 +119,73 @@ async function loadCredentialsSheet() {
 
 /*
 ========================================
+UPDATE TELEGRAM ID
+========================================
+*/
+
+async function updateTelegramId(
+    code,
+    telegramId
+) {
+
+    const sheet = await loadUsersSheet();
+
+    const rows = await sheet.getRows();
+
+    for(const row of rows) {
+
+        const rowCode = String(
+            row.get('Code')
+        ).trim();
+
+        if(rowCode === code) {
+
+            /*
+            ========================================
+            SAFETY CHECK
+            ========================================
+            */
+
+            const existingTelegramId = String(
+                row.get('User Telegram Id') || ''
+            ).trim();
+
+            if(existingTelegramId) {
+
+                return {
+                    success: false,
+                    message:
+                    'Telegram ID already exists'
+                };
+            }
+
+            /*
+            ========================================
+            UPDATE TELEGRAM ID
+            ========================================
+            */
+
+            row.set(
+                'User Telegram Id',
+                telegramId.toString()
+            );
+
+            await row.save();
+
+            return {
+                success: true
+            };
+        }
+    }
+
+    return {
+        success: false,
+        message: 'Code not found'
+    };
+}
+
+/*
+========================================
 CHECK EXPIRY
 ========================================
 */
@@ -657,7 +724,7 @@ Need Help?
 
 /*
 ========================================
-CALLBACK TEST
+APPROVE / REJECT CALLBACK
 ========================================
 */
 
@@ -688,27 +755,166 @@ bot.on('callback_query', async (query) => {
 
         /*
         ========================================
-        LOG CALLBACK
+        GET CALLBACK DATA
         ========================================
         */
 
-        console.log(
-            'CALLBACK DATA:',
-            query.data
-        );
+        const data = query.data;
+
+        const parts = data.split('_');
+
+        const action = parts[0];
+
+        const code = parts[1];
+
+        const telegramId = parts[2];
 
         /*
         ========================================
-        SUCCESS POPUP
+        APPROVE
         ========================================
         */
 
-        bot.answerCallbackQuery(
-            query.id,
-            {
-                text: 'Button Working'
+        if(action === 'approve') {
+
+            const result =
+            await updateTelegramId(
+                code,
+                telegramId
+            );
+
+            if(!result.success) {
+
+                bot.answerCallbackQuery(
+                    query.id,
+                    {
+                        text: result.message
+                    }
+                );
+
+                return;
             }
-        );
+
+            /*
+            ========================================
+            REMOVE BUTTONS
+            ========================================
+            */
+
+            await bot.editMessageReplyMarkup(
+                {
+                    inline_keyboard: []
+                },
+                {
+                    chat_id:
+                    query.message.chat.id,
+
+                    message_id:
+                    query.message.message_id
+                }
+            );
+
+            /*
+            ========================================
+            ADMIN SUCCESS
+            ========================================
+            */
+
+            bot.answerCallbackQuery(
+                query.id,
+                {
+                    text: 'User Approved'
+                }
+            );
+
+            /*
+            ========================================
+            USER MESSAGE
+            ========================================
+            */
+
+            bot.sendMessage(
+                telegramId,
+
+`✅ ACCOUNT APPROVED
+
+━━━━━━━━━━━━━━
+
+Your account has been approved successfully.
+
+You can now use:
+
+/start
+
+━━━━━━━━━━━━━━`
+            );
+
+            return;
+        }
+
+        /*
+        ========================================
+        REJECT
+        ========================================
+        */
+
+        if(action === 'reject') {
+
+            /*
+            ========================================
+            REMOVE BUTTONS
+            ========================================
+            */
+
+            await bot.editMessageReplyMarkup(
+                {
+                    inline_keyboard: []
+                },
+                {
+                    chat_id:
+                    query.message.chat.id,
+
+                    message_id:
+                    query.message.message_id
+                }
+            );
+
+            /*
+            ========================================
+            ADMIN POPUP
+            ========================================
+            */
+
+            bot.answerCallbackQuery(
+                query.id,
+                {
+                    text: 'User Rejected'
+                }
+            );
+
+            /*
+            ========================================
+            USER MESSAGE
+            ========================================
+            */
+
+            bot.sendMessage(
+                telegramId,
+
+`❌ VALIDATION REJECTED
+
+━━━━━━━━━━━━━━
+
+Your validation request was rejected.
+
+Need Help?
+/admincontact
+
+━━━━━━━━━━━━━━`
+            );
+
+            return;
+        }
 
     }
 
