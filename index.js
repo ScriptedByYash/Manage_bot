@@ -204,6 +204,41 @@ async function updateTelegramId(
 
 /*
 ========================================
+GENERATE NEXT CODE
+========================================
+*/
+
+async function generateNextCode() {
+
+    const sheet = await loadUsersSheet();
+
+    const rows = await sheet.getRows();
+
+    /*
+    ========================================
+    DEFAULT START CODE
+    ========================================
+    */
+
+    let maxCode = 15550;
+
+    for(const row of rows) {
+
+        const code = parseInt(
+            row.get('Code')
+        );
+
+        if(!isNaN(code) && code > maxCode) {
+
+            maxCode = code;
+        }
+    }
+
+    return (maxCode + 1).toString();
+}
+
+/*
+========================================
 CHECK EXPIRY
 ========================================
 */
@@ -764,14 +799,12 @@ if(session.step === 'mobile') {
     session.data.mobile = msg.text;
 
     /*
-    ========================================
-    GENERATE UNIQUE CODE
-    ========================================
-    */
+========================================
+GENERATE NEXT CODE
+========================================
+*/
 
-    const code = Math.floor(
-        100000 + Math.random() * 900000
-    ).toString();
+const code = await generateNextCode();
 
     /*
     ========================================
