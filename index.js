@@ -15,6 +15,14 @@ const bot = new TelegramBot(token, {
 
 /*
 ========================================
+ADMIN SESSION STORAGE
+========================================
+*/
+
+const adminSessions = {};
+
+/*
+========================================
 TELEGRAM MENU COMMANDS
 ========================================
 */
@@ -74,6 +82,16 @@ bot.setMyCommands([
     {
         command: 'vbcsdbdetail',
         description: 'VBCS DB Detail'
+    },
+
+    {
+    command: 'createuser',
+    description: 'Create New User'
+    },
+
+    {
+    command: 'updateuser',
+    description: 'Update User'
     }
 
 ]);
@@ -115,6 +133,108 @@ async function loadCredentialsSheet() {
     await doc.loadInfo();
 
     return doc.sheetsByTitle['Credentials'];
+}
+
+/*
+========================================
+UPDATE TELEGRAM ID
+========================================
+*/
+
+async function updateTelegramId(
+    code,
+    telegramId
+) {
+
+    const sheet = await loadUsersSheet();
+
+    const rows = await sheet.getRows();
+
+    for(const row of rows) {
+
+        const rowCode = String(
+            row.get('Code')
+        ).trim();
+
+        if(rowCode === code) {
+
+            /*
+            ========================================
+            SAFETY CHECK
+            ========================================
+            */
+
+            const existingTelegramId = String(
+                row.get('User Telegram Id') || ''
+            ).trim();
+
+            if(existingTelegramId) {
+
+                return {
+                    success: false,
+                    message:
+                    'Telegram ID already exists'
+                };
+            }
+
+            /*
+            ========================================
+            UPDATE TELEGRAM ID
+            ========================================
+            */
+
+            row.set(
+                'User Telegram Id',
+                telegramId.toString()
+            );
+
+            await row.save();
+
+            return {
+                success: true
+            };
+        }
+    }
+
+    return {
+        success: false,
+        message: 'Code not found'
+    };
+}
+
+/*
+========================================
+GENERATE NEXT CODE
+========================================
+*/
+
+async function generateNextCode() {
+
+    const sheet = await loadUsersSheet();
+
+    const rows = await sheet.getRows();
+
+    /*
+    ========================================
+    DEFAULT START CODE
+    ========================================
+    */
+
+    let maxCode = 15550;
+
+    for(const row of rows) {
+
+        const code = parseInt(
+            row.get('Code')
+        );
+
+        if(!isNaN(code) && code > maxCode) {
+
+            maxCode = code;
+        }
+    }
+
+    return (maxCode + 1).toString();
 }
 
 /*
@@ -301,6 +421,20 @@ function hasOICAccess(type) {
 
 /*
 ========================================
+ADMIN CHECK
+========================================
+*/
+
+function isAdmin(userId) {
+
+    return (
+        userId.toString() ===
+        process.env.ADMIN_ID
+    );
+}
+
+/*
+========================================
 VALID USER CHECK
 ========================================
 */
@@ -353,6 +487,54 @@ Need Help?
         user
     };
 }
+
+/*
+========================================
+CREATE USER
+========================================
+*/
+
+bot.onText(/^\/createuser$/, async (msg) => {
+
+    try {
+
+        if(!isAdmin(msg.from.id)) {
+
+            bot.sendMessage(
+                msg.chat.id,
+                'Unauthorized'
+            );
+
+            return;
+        }
+
+        adminSessions[msg.chat.id] = {
+
+            action: 'create_user',
+
+            step: 'name',
+
+            data: {}
+        };
+
+        bot.sendMessage(
+            msg.chat.id,
+
+`👤 CREATE USER
+
+━━━━━━━━━━━━━━
+
+Enter User Name:
+`
+        );
+
+    }
+
+    catch(error) {
+
+        console.log(error);
+    }
+});
 
 /*
 ========================================
@@ -437,6 +619,353 @@ I provide high-speed access to Oracle Fusion and OIC instances, including SFTP &
 
 /*
 ========================================
+ADMIN CREATE USER FLOW
+========================================
+*/
+
+bot.on('message', async (msg) => {
+
+    try {
+
+        if(!msg.text) return;
+
+        if(!isAdmin(msg.from.id)) return;
+
+        const session = adminSessions[msg.chat.id];
+
+        if(!session) return;
+
+        if(session.action !== 'create_user') return;
+
+        /*
+        ========================================
+        USER NAME
+        ========================================
+        */
+
+        if(session.step === 'name') {
+
+            session.data.userName = msg.text;
+
+            session.step = 'plan';
+
+            bot.sendMessage(
+                msg.chat.id,
+
+`📦 SELECT PLAN
+
+━━━━━━━━━━━━━━
+
+Send Any One:
+
+OIC
+FUSION
+BOTH`
+            );
+
+            return;
+        }
+
+        /*
+        ========================================
+        PLAN
+        ========================================
+        */
+
+        if(session.step === 'plan') {
+
+            const plan = msg.text
+                .trim()
+                .toUpperCase();
+
+            if(
+                plan !== 'OIC' &&
+                plan !== 'FUSION' &&
+                plan !== 'BOTH'
+            ) {
+
+                bot.sendMessage(
+                    msg.chat.id,
+                    'Invalid Plan'
+                );
+
+                return;
+            }
+
+            session.data.plan = plan;
+
+            session.step = 'expiry';
+
+            bot.sendMessage(
+                msg.chat.id,
+
+`📅 ENTER EXPIRY DATE
+
+━━━━━━━━━━━━━━
+
+Example:
+15-Jun-2026`
+            );
+
+            return;
+        }
+
+        /*
+========================================
+EXPIRY DATE
+========================================
+*/
+
+if(session.step === 'expiry') {
+
+    session.data.expiry = msg.text;
+
+    session.step = 'payment';
+
+    bot.sendMessage(
+        msg.chat.id,
+
+`💰 ENTER LAST PAYMENT
+
+━━━━━━━━━━━━━━
+
+Example:
+500`
+    );
+
+    return;
+}
+
+/*
+========================================
+LAST PAYMENT
+========================================
+*/
+
+if(session.step === 'payment') {
+
+    session.data.payment = msg.text;
+
+    session.step = 'country_code';
+
+    bot.sendMessage(
+        msg.chat.id,
+
+`🌍 ENTER COUNTRY CODE
+
+━━━━━━━━━━━━━━
+
+Example:
+91`
+    );
+
+    return;
+}
+
+/*
+========================================
+COUNTRY CODE
+========================================
+*/
+
+if(session.step === 'country_code') {
+
+    session.data.countryCode = msg.text;
+
+    session.step = 'mobile';
+
+    bot.sendMessage(
+        msg.chat.id,
+
+`📞 ENTER MOBILE NUMBER
+
+━━━━━━━━━━━━━━
+
+Example:
+9876543210`
+    );
+
+    return;
+}
+
+/*
+========================================
+MOBILE NUMBER
+========================================
+*/
+
+if(session.step === 'mobile') {
+
+    session.data.mobile = msg.text;
+
+    /*
+========================================
+GENERATE NEXT CODE
+========================================
+*/
+
+const code = await generateNextCode();
+
+    /*
+    ========================================
+    TODAY DATE
+    ========================================
+    */
+
+    const today = new Date();
+
+    const paidDate = today
+        .toLocaleDateString(
+            'en-GB',
+            {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+            }
+        )
+        .replace(/ /g, '-');
+
+    /*
+    ========================================
+    RENEW DATE
+    ========================================
+    */
+
+    const expiryParts =
+    session.data.expiry.split('-');
+
+    const months = {
+        Jan: 0,
+        Feb: 1,
+        Mar: 2,
+        Apr: 3,
+        May: 4,
+        Jun: 5,
+        Jul: 6,
+        Aug: 7,
+        Sep: 8,
+        Oct: 9,
+        Nov: 10,
+        Dec: 11
+    };
+
+    const expiryDate = new Date(
+        parseInt(expiryParts[2]),
+        months[expiryParts[1]],
+        parseInt(expiryParts[0])
+    );
+
+    expiryDate.setDate(
+        expiryDate.getDate() - 5
+    );
+
+    const renewDate = expiryDate
+        .toLocaleDateString(
+            'en-GB',
+            {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+            }
+        )
+        .replace(/ /g, '-');
+
+    /*
+    ========================================
+    INSERT GOOGLE SHEET ROW
+    ========================================
+    */
+
+    const sheet = await loadUsersSheet();
+
+    await sheet.addRow({
+
+        Code: code,
+
+        Paid: paidDate,
+
+        Expiry: session.data.expiry,
+
+        Renew: renewDate,
+
+        Active: 'TRUE',
+
+        Instances: session.data.plan,
+
+        'Last payment':
+        session.data.payment,
+
+        'User Name':
+        session.data.userName,
+
+        'User Country Code':
+        session.data.countryCode,
+
+        'User Mobile':
+        session.data.mobile,
+
+        'User Telegram Id': ''
+    });
+
+    /*
+    ========================================
+    SUCCESS MESSAGE
+    ========================================
+    */
+
+    bot.sendMessage(
+        msg.chat.id,
+
+`✅ USER CREATED
+
+━━━━━━━━━━━━━━
+
+👤 User
+${session.data.userName}
+
+🔑 Code
+${code}
+
+📦 Plan
+${session.data.plan}
+
+💰 Payment
+${session.data.payment}
+
+📞 Mobile
++${session.data.countryCode}
+${session.data.mobile}
+
+📅 Expiry
+${session.data.expiry}
+
+📅 Renew
+${renewDate}
+
+━━━━━━━━━━━━━━`
+    );
+
+    /*
+    ========================================
+    CLEAR SESSION
+    ========================================
+    */
+
+    delete adminSessions[msg.chat.id];
+
+    return;
+}
+
+    }
+
+    catch(error) {
+
+        console.log(error);
+    }
+});
+
+/*
+========================================
 VALIDATE
 ========================================
 */
@@ -447,7 +976,17 @@ bot.on('message', async (msg) => {
 
         if(!msg.text) return;
 
-        if(!msg.text.startsWith('/validate')) return;
+/*
+========================================
+IGNORE ADMIN SESSIONS
+========================================
+*/
+
+if(adminSessions[msg.chat.id]) {
+    return;
+}
+
+if(!msg.text.startsWith('/validate')) return;
 
         const parts = msg.text.split(' ');
 
@@ -538,8 +1077,8 @@ Need Help?
 
             if(process.env.ADMIN_ID) {
 
-                bot.sendMessage(
-                    process.env.ADMIN_ID,
+    bot.sendMessage(
+        process.env.ADMIN_ID,
 
 `🚨 NEW USER VALIDATION
 
@@ -566,9 +1105,27 @@ ${user.UserCountryCode || 'N/A'}
 📞 Mobile
 ${user.UserMobile || 'N/A'}
 
-━━━━━━━━━━━━━━`
-                );
-            }
+━━━━━━━━━━━━━━`,
+
+{
+    reply_markup: {
+        inline_keyboard: [
+            [
+                {
+                    text: '✅ Approve',
+                    callback_data:
+                    `approve_${user.Code}_${msg.from.id}`
+                },
+                {
+                    text: '❌ Reject',
+                    callback_data:
+                    `reject_${user.Code}_${msg.from.id}`
+                }
+            ]
+        ]
+    }
+});
+}
 
             bot.sendMessage(msg.chat.id,
 `⏳ REQUEST SUBMITTED
@@ -634,6 +1191,208 @@ ${error.message}
 
 Need Help?
 /admincontact`);
+    }
+});
+
+/*
+========================================
+APPROVE / REJECT CALLBACK
+========================================
+*/
+
+bot.on('callback_query', async (query) => {
+
+    try {
+
+        /*
+        ========================================
+        ADMIN SECURITY
+        ========================================
+        */
+
+        if(
+            query.from.id.toString() !==
+            process.env.ADMIN_ID
+        ) {
+
+            bot.answerCallbackQuery(
+                query.id,
+                {
+                    text: 'Unauthorized'
+                }
+            );
+
+            return;
+        }
+
+        /*
+        ========================================
+        GET CALLBACK DATA
+        ========================================
+        */
+
+        const data = query.data;
+
+        const parts = data.split('_');
+
+        const action = parts[0];
+
+        const code = parts[1];
+
+        const telegramId = parts[2];
+
+        /*
+        ========================================
+        APPROVE
+        ========================================
+        */
+
+        if(action === 'approve') {
+
+            const result =
+            await updateTelegramId(
+                code,
+                telegramId
+            );
+
+            if(!result.success) {
+
+                bot.answerCallbackQuery(
+                    query.id,
+                    {
+                        text: result.message
+                    }
+                );
+
+                return;
+            }
+
+            /*
+            ========================================
+            REMOVE BUTTONS
+            ========================================
+            */
+
+            await bot.editMessageReplyMarkup(
+                {
+                    inline_keyboard: []
+                },
+                {
+                    chat_id:
+                    query.message.chat.id,
+
+                    message_id:
+                    query.message.message_id
+                }
+            );
+
+            /*
+            ========================================
+            ADMIN SUCCESS
+            ========================================
+            */
+
+            bot.answerCallbackQuery(
+                query.id,
+                {
+                    text: 'User Approved'
+                }
+            );
+
+            /*
+            ========================================
+            USER MESSAGE
+            ========================================
+            */
+
+            bot.sendMessage(
+                telegramId,
+
+`✅ ACCOUNT APPROVED
+
+━━━━━━━━━━━━━━
+
+Your account has been approved successfully.
+
+You can now use:
+
+/start
+
+━━━━━━━━━━━━━━`
+            );
+
+            return;
+        }
+
+        /*
+        ========================================
+        REJECT
+        ========================================
+        */
+
+        if(action === 'reject') {
+
+            /*
+            ========================================
+            REMOVE BUTTONS
+            ========================================
+            */
+
+            await bot.editMessageReplyMarkup(
+                {
+                    inline_keyboard: []
+                },
+                {
+                    chat_id:
+                    query.message.chat.id,
+
+                    message_id:
+                    query.message.message_id
+                }
+            );
+
+            /*
+            ========================================
+            ADMIN POPUP
+            ========================================
+            */
+
+            bot.answerCallbackQuery(
+                query.id,
+                {
+                    text: 'User Rejected'
+                }
+            );
+
+            /*
+            ========================================
+            USER MESSAGE
+            ========================================
+            */
+
+            bot.sendMessage(
+                telegramId,
+
+`❌ VALIDATION REJECTED
+
+━━━━━━━━━━━━━━
+
+Your validation request was rejected.
+
+Need Help?
+/admincontact
+
+━━━━━━━━━━━━━━`
+            );
+
+            return;
+        }
+
+    }
+
+    catch(error) {
+
+        console.log(error);
     }
 });
 
