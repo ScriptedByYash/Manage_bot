@@ -23,78 +23,55 @@ const adminSessions = {};
 
 /*
 ========================================
-TELEGRAM MENU COMMANDS
+TELEGRAM MENU COMMANDS - USER
 ========================================
 */
 
 bot.setMyCommands([
 
-    {
-        command: 'start',
-        description: 'Start Bot'
-    },
-
-    {
-        command: 'validate',
-        description: 'Validate Your Code'
-    },
-
-    {
-        command: 'expiry',
-        description: 'Check Subscription'
-    },
-
-    {
-        command: 'renew',
-        description: 'Renew Subscription'
-    },
-
-    {
-        command: 'admincontact',
-        description: 'Contact Admin'
-    },
-
-    {
-        command: 'fusioninstance',
-        description: 'Fusion Instance Detail'
-    },
-
-    {
-        command: 'oicinstance',
-        description: 'OIC Instance Detail'
-    },
-
-    {
-        command: 'oicsftpdetail',
-        description: 'OIC SFTP Detail'
-    },
-
-    {
-        command: 'atpdetail',
-        description: 'ATP Detail'
-    },
-
-    {
-        command: 'ftpdetail',
-        description: 'FTP Detail'
-    },
-
-    {
-        command: 'vbcsdbdetail',
-        description: 'VBCS DB Detail'
-    },
-
-    {
-    command: 'createuser',
-    description: 'Create New User'
-    },
-
-    {
-    command: 'updateuser',
-    description: 'Update User'
-    }
+    { command: 'start', description: 'Start Bot' },
+    { command: 'validate', description: 'Validate Your Code' },
+    { command: 'expiry', description: 'Check Subscription' },
+    { command: 'renew', description: 'Renew Subscription' },
+    { command: 'admincontact', description: 'Contact Admin' },
+    { command: 'fusioninstance', description: 'Fusion Instance Detail' },
+    { command: 'oicinstance', description: 'OIC Instance Detail' },
+    { command: 'oicsftpdetail', description: 'OIC SFTP Detail' },
+    { command: 'atpdetail', description: 'ATP Detail' },
+    { command: 'ftpdetail', description: 'FTP Detail' },
+    { command: 'vbcsdbdetail', description: 'VBCS DB Detail' }
 
 ]);
+
+/*
+========================================
+TELEGRAM MENU COMMANDS - ADMIN ONLY
+========================================
+*/
+
+bot.setMyCommands([
+
+    { command: 'start', description: 'Start Bot' },
+    { command: 'validate', description: 'Validate Your Code' },
+    { command: 'expiry', description: 'Check Subscription' },
+    { command: 'renew', description: 'Renew Subscription' },
+    { command: 'admincontact', description: 'Contact Admin' },
+    { command: 'fusioninstance', description: 'Fusion Instance Detail' },
+    { command: 'oicinstance', description: 'OIC Instance Detail' },
+    { command: 'oicsftpdetail', description: 'OIC SFTP Detail' },
+    { command: 'atpdetail', description: 'ATP Detail' },
+    { command: 'ftpdetail', description: 'FTP Detail' },
+    { command: 'vbcsdbdetail', description: 'VBCS DB Detail' },
+    { command: 'createuser', description: 'Create New User' },
+    { command: 'updateuser', description: 'Update User' }
+
+],
+{
+    scope: {
+        type: 'chat',
+        chat_id: parseInt(process.env.ADMIN_ID)
+    }
+});
 
 /*
 ========================================
@@ -158,12 +135,6 @@ async function updateTelegramId(
 
         if(rowCode === code) {
 
-            /*
-            ========================================
-            SAFETY CHECK
-            ========================================
-            */
-
             const existingTelegramId = String(
                 row.get('User Telegram Id') || ''
             ).trim();
@@ -172,16 +143,9 @@ async function updateTelegramId(
 
                 return {
                     success: false,
-                    message:
-                    'Telegram ID already exists'
+                    message: 'Telegram ID already exists'
                 };
             }
-
-            /*
-            ========================================
-            UPDATE TELEGRAM ID
-            ========================================
-            */
 
             row.set(
                 'User Telegram Id',
@@ -190,9 +154,7 @@ async function updateTelegramId(
 
             await row.save();
 
-            return {
-                success: true
-            };
+            return { success: true };
         }
     }
 
@@ -200,6 +162,86 @@ async function updateTelegramId(
         success: false,
         message: 'Code not found'
     };
+}
+
+/*
+========================================
+UPDATE USER FIELD
+========================================
+*/
+
+async function updateUserField(code, fieldName, fieldValue) {
+
+    const sheet = await loadUsersSheet();
+
+    const rows = await sheet.getRows();
+
+    for(const row of rows) {
+
+        const rowCode = String(
+            row.get('Code')
+        ).trim();
+
+        if(rowCode === code) {
+
+            row.set(fieldName, fieldValue);
+
+            /*
+            ========================================
+            AUTO UPDATE RENEW DATE IF EXPIRY CHANGES
+            ========================================
+            */
+
+            if(fieldName === 'Expiry') {
+
+                const renewDate = calculateRenewDate(fieldValue);
+
+                row.set('Renew', renewDate);
+            }
+
+            await row.save();
+
+            return { success: true };
+        }
+    }
+
+    return {
+        success: false,
+        message: 'Code not found'
+    };
+}
+
+/*
+========================================
+CALCULATE RENEW DATE (EXPIRY - 5 DAYS)
+========================================
+*/
+
+function calculateRenewDate(expiryStr) {
+
+    const months = {
+        Jan: 0, Feb: 1, Mar: 2, Apr: 3,
+        May: 4, Jun: 5, Jul: 6, Aug: 7,
+        Sep: 8, Oct: 9, Nov: 10, Dec: 11
+    };
+
+    const parts = expiryStr.split('-');
+
+    const expiryDate = new Date(
+        parseInt(parts[2]),
+        months[parts[1]],
+        parseInt(parts[0])
+    );
+
+    expiryDate.setDate(expiryDate.getDate() - 5);
+
+    return expiryDate
+        .toLocaleDateString('en-GB', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric'
+        })
+        .replace(/ /g, '-');
 }
 
 /*
@@ -214,19 +256,11 @@ async function generateNextCode() {
 
     const rows = await sheet.getRows();
 
-    /*
-    ========================================
-    DEFAULT START CODE
-    ========================================
-    */
-
     let maxCode = 15550;
 
     for(const row of rows) {
 
-        const code = parseInt(
-            row.get('Code')
-        );
+        const code = parseInt(row.get('Code'));
 
         if(!isNaN(code) && code > maxCode) {
 
@@ -246,34 +280,21 @@ CHECK EXPIRY
 function isExpired(expiryDate) {
 
     const months = {
-        Jan: 0,
-        Feb: 1,
-        Mar: 2,
-        Apr: 3,
-        May: 4,
-        Jun: 5,
-        Jul: 6,
-        Aug: 7,
-        Sep: 8,
-        Oct: 9,
-        Nov: 10,
-        Dec: 11
+        Jan: 0, Feb: 1, Mar: 2, Apr: 3,
+        May: 4, Jun: 5, Jul: 6, Aug: 7,
+        Sep: 8, Oct: 9, Nov: 10, Dec: 11
     };
 
     const parts = expiryDate.split('-');
 
     const day = parseInt(parts[0]);
-
     const month = months[parts[1]];
-
     const year = parseInt(parts[2]);
 
     const expiry = new Date(year, month, day);
-
     const today = new Date();
 
     expiry.setHours(0,0,0,0);
-
     today.setHours(0,0,0,0);
 
     return today > expiry;
@@ -281,7 +302,7 @@ function isExpired(expiryDate) {
 
 /*
 ========================================
-GET USER DATA
+GET USER BY CODE
 ========================================
 */
 
@@ -293,36 +314,19 @@ async function getUserByCode(code) {
 
     const users = rows.map(row => ({
         Code: String(row.get('Code')).trim(),
-
         Paid: row.get('Paid'),
-
         Expiry: row.get('Expiry'),
-
         Renew: row.get('Renew'),
-
         Active: String(row.get('Active')).trim(),
-
         LastPayment: row.get('Last payment'),
-
         UserName: row.get('User Name'),
-
         UserCountryCode: row.get('User Country Code'),
-
         UserMobile: row.get('User Mobile'),
-
-        UserTelegramId: String(
-            row.get('User Telegram Id') || ''
-        ).trim(),
-
-        Instances: String(row.get('Instances'))
-            .trim()
-            .replace(/\s/g, '')
-            .toUpperCase()
+        UserTelegramId: String(row.get('User Telegram Id') || '').trim(),
+        Instances: String(row.get('Instances')).trim().replace(/\s/g, '').toUpperCase()
     }));
 
-    return users.find(
-        u => u.Code === code
-    );
+    return users.find(u => u.Code === code);
 }
 
 /*
@@ -339,36 +343,19 @@ async function getUserByTelegramId(chatId) {
 
     const users = rows.map(row => ({
         Code: String(row.get('Code')).trim(),
-
         Paid: row.get('Paid'),
-
         Expiry: row.get('Expiry'),
-
         Renew: row.get('Renew'),
-
         Active: String(row.get('Active')).trim(),
-
         LastPayment: row.get('Last payment'),
-
         UserName: row.get('User Name'),
-
         UserCountryCode: row.get('User Country Code'),
-
         UserMobile: row.get('User Mobile'),
-
-        UserTelegramId: String(
-            row.get('User Telegram Id') || ''
-        ).trim(),
-
-        Instances: String(row.get('Instances'))
-            .trim()
-            .replace(/\s/g, '')
-            .toUpperCase()
+        UserTelegramId: String(row.get('User Telegram Id') || '').trim(),
+        Instances: String(row.get('Instances')).trim().replace(/\s/g, '').toUpperCase()
     }));
 
-    return users.find(
-        u => u.UserTelegramId === chatId.toString()
-    );
+    return users.find(u => u.UserTelegramId === chatId.toString());
 }
 
 /*
@@ -383,9 +370,7 @@ async function getCredentials() {
 
     const rows = await sheet.getRows();
 
-    if(rows.length === 0) {
-        return null;
-    }
+    if(rows.length === 0) return null;
 
     return {
         fusion: rows[0].get('Fusion Detail'),
@@ -404,19 +389,11 @@ ACCESS CHECK
 */
 
 function hasFusionAccess(type) {
-
-    return (
-        type === 'FUSION' ||
-        type === 'BOTH'
-    );
+    return type === 'FUSION' || type === 'BOTH';
 }
 
 function hasOICAccess(type) {
-
-    return (
-        type === 'OIC' ||
-        type === 'BOTH'
-    );
+    return type === 'OIC' || type === 'BOTH';
 }
 
 /*
@@ -426,11 +403,7 @@ ADMIN CHECK
 */
 
 function isAdmin(userId) {
-
-    return (
-        userId.toString() ===
-        process.env.ADMIN_ID
-    );
+    return userId.toString() === process.env.ADMIN_ID;
 }
 
 /*
@@ -444,7 +417,6 @@ async function validateUserAccess(chatId) {
     const user = await getUserByTelegramId(chatId);
 
     if(!user) {
-
         return {
             success: false,
             message:
@@ -461,7 +433,6 @@ Need Help?
         user.Active.toUpperCase() !== 'TRUE' ||
         isExpired(user.Expiry)
     ) {
-
         return {
             success: false,
             message:
@@ -482,15 +453,164 @@ Need Help?
         };
     }
 
-    return {
-        success: true,
-        user
-    };
+    return { success: true, user };
 }
 
 /*
 ========================================
-CREATE USER
+SAVE CREATE USER TO SHEET
+========================================
+*/
+
+async function saveNewUser(chatId, data) {
+
+    const code = await generateNextCode();
+
+    const today = new Date();
+
+    const paidDate = today
+        .toLocaleDateString('en-GB', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric'
+        })
+        .replace(/ /g, '-');
+
+    const renewDate = calculateRenewDate(data.expiry);
+
+    const sheet = await loadUsersSheet();
+
+    await sheet.addRow({
+        Code: code,
+        Paid: paidDate,
+        Expiry: data.expiry,
+        Renew: renewDate,
+        Active: 'TRUE',
+        Instances: data.plan,
+        'Last payment': data.payment,
+        'User Name': data.userName,
+        'User Country Code': data.countryCode || '',
+        'User Mobile': data.mobile || '',
+        'User Telegram Id': ''
+    });
+
+    bot.sendMessage(
+        chatId,
+
+`✅ USER CREATED
+
+━━━━━━━━━━━━━━
+
+👤 User
+${data.userName}
+
+🔑 Code
+${code}
+
+📦 Plan
+${data.plan}
+
+💰 Payment
+${data.payment}
+
+🌍 Country Code
+${data.countryCode ? '+' + data.countryCode : 'N/A'}
+
+📞 Mobile
+${data.mobile || 'N/A'}
+
+📅 Expiry
+${data.expiry}
+
+📅 Renew
+${renewDate}
+
+━━━━━━━━━━━━━━`
+    );
+
+    delete adminSessions[chatId];
+}
+
+/*
+========================================
+SHOW UPDATE FIELD BUTTONS
+========================================
+*/
+
+function showUpdateFieldButtons(chatId, user) {
+
+    bot.sendMessage(
+        chatId,
+
+`✏️ UPDATE USER
+
+━━━━━━━━━━━━━━
+
+👤 User
+${user.UserName || 'N/A'}
+
+🔑 Code
+${user.Code}
+
+📦 Plan
+${user.Instances}
+
+📅 Expiry
+${user.Expiry}
+
+🔄 Renew
+${user.Renew}
+
+💰 Last Payment
+${user.LastPayment || 'N/A'}
+
+🌍 Country Code
+${user.UserCountryCode || 'N/A'}
+
+📞 Mobile
+${user.UserMobile || 'N/A'}
+
+🔘 Active
+${user.Active}
+
+📱 Telegram ID
+${user.UserTelegramId || 'N/A'}
+
+━━━━━━━━━━━━━━
+
+Select Field to Update:`,
+
+        {
+            reply_markup: {
+                inline_keyboard: [
+                    [
+                        { text: '👤 Name', callback_data: 'upd_field_name' },
+                        { text: '📦 Plan', callback_data: 'upd_field_plan' }
+                    ],
+                    [
+                        { text: '📅 Expiry', callback_data: 'upd_field_expiry' },
+                        { text: '💰 Payment', callback_data: 'upd_field_payment' }
+                    ],
+                    [
+                        { text: '🌍 Country Code', callback_data: 'upd_field_country' },
+                        { text: '📞 Mobile', callback_data: 'upd_field_mobile' }
+                    ],
+                    [
+                        { text: '🔘 Active', callback_data: 'upd_field_active' },
+                        { text: '📱 Telegram ID', callback_data: 'upd_field_telegram' }
+                    ],
+                    [
+                        { text: '❌ Cancel', callback_data: 'upd_cancel' }
+                    ]
+                ]
+            }
+        }
+    );
+}
+
+/*
+========================================
+CREATE USER COMMAND
 ========================================
 */
 
@@ -499,21 +619,13 @@ bot.onText(/^\/createuser$/, async (msg) => {
     try {
 
         if(!isAdmin(msg.from.id)) {
-
-            bot.sendMessage(
-                msg.chat.id,
-                'Unauthorized'
-            );
-
+            bot.sendMessage(msg.chat.id, 'Unauthorized');
             return;
         }
 
         adminSessions[msg.chat.id] = {
-
             action: 'create_user',
-
             step: 'name',
-
             data: {}
         };
 
@@ -524,14 +636,46 @@ bot.onText(/^\/createuser$/, async (msg) => {
 
 ━━━━━━━━━━━━━━
 
-Enter User Name:
-`
+Enter User Name:`
         );
 
+    } catch(error) {
+        console.log(error);
     }
+});
 
-    catch(error) {
+/*
+========================================
+UPDATE USER COMMAND
+========================================
+*/
 
+bot.onText(/^\/updateuser$/, async (msg) => {
+
+    try {
+
+        if(!isAdmin(msg.from.id)) {
+            bot.sendMessage(msg.chat.id, 'Unauthorized');
+            return;
+        }
+
+        adminSessions[msg.chat.id] = {
+            action: 'update_user',
+            step: 'code',
+            data: {}
+        };
+
+        bot.sendMessage(
+            msg.chat.id,
+
+`✏️ UPDATE USER
+
+━━━━━━━━━━━━━━
+
+Enter User Code:`
+        );
+
+    } catch(error) {
         console.log(error);
     }
 });
@@ -586,31 +730,31 @@ I provide high-speed access to Oracle Fusion and OIC instances, including SFTP &
 ────────────────────────
 
 📅 /expiry
-  (Check Expiry Date)
+  (Check Expiry Date)
 
 🔄 /renew
-  (Renew Subscription)
+  (Renew Subscription)
 
 👨‍💼 /admincontact
-  (Contact Admin)
+  (Contact Admin)
 
 🚀 /fusioninstance
-  (Fusion Instance Details)
+  (Fusion Instance Details)
 
 ☁️ /oicinstance
-  (OIC Instance Details)
+  (OIC Instance Details)
 
 📂 /oicsftpdetail
-  (OIC SFTP Details)
+  (OIC SFTP Details)
 
 🗄 /atpdetail
-  (ATP Database Details)
+  (ATP Database Details)
 
 📁 /ftpdetail
-  (FTP Details)
+  (FTP Details)
 
 🗃 /vbcsdbdetail
-  (VBCS Database Details)
+  (VBCS Database Details)
 
 ────────────────────────
 
@@ -619,7 +763,7 @@ I provide high-speed access to Oracle Fusion and OIC instances, including SFTP &
 
 /*
 ========================================
-ADMIN CREATE USER FLOW
+ADMIN SESSION FLOW (CREATE + UPDATE)
 ========================================
 */
 
@@ -635,22 +779,28 @@ bot.on('message', async (msg) => {
 
         if(!session) return;
 
-        if(session.action !== 'create_user') return;
-
         /*
         ========================================
-        USER NAME
+        CREATE USER FLOW
         ========================================
         */
 
-        if(session.step === 'name') {
+        if(session.action === 'create_user') {
 
-            session.data.userName = msg.text;
+            /*
+            ----------------------------------------
+            NAME
+            ----------------------------------------
+            */
 
-            session.step = 'plan';
+            if(session.step === 'name') {
 
-            bot.sendMessage(
-                msg.chat.id,
+                session.data.userName = msg.text;
+
+                session.step = 'plan';
+
+                bot.sendMessage(
+                    msg.chat.id,
 
 `📦 SELECT PLAN
 
@@ -661,43 +811,36 @@ Send Any One:
 OIC
 FUSION
 BOTH`
-            );
-
-            return;
-        }
-
-        /*
-        ========================================
-        PLAN
-        ========================================
-        */
-
-        if(session.step === 'plan') {
-
-            const plan = msg.text
-                .trim()
-                .toUpperCase();
-
-            if(
-                plan !== 'OIC' &&
-                plan !== 'FUSION' &&
-                plan !== 'BOTH'
-            ) {
-
-                bot.sendMessage(
-                    msg.chat.id,
-                    'Invalid Plan'
                 );
 
                 return;
             }
 
-            session.data.plan = plan;
+            /*
+            ----------------------------------------
+            PLAN
+            ----------------------------------------
+            */
 
-            session.step = 'expiry';
+            if(session.step === 'plan') {
 
-            bot.sendMessage(
-                msg.chat.id,
+                const plan = msg.text.trim().toUpperCase();
+
+                if(
+                    plan !== 'OIC' &&
+                    plan !== 'FUSION' &&
+                    plan !== 'BOTH'
+                ) {
+                    bot.sendMessage(msg.chat.id, 'Invalid Plan. Send OIC, FUSION or BOTH');
+                    return;
+                }
+
+                session.data.plan = plan;
+
+                session.step = 'expiry';
+
+                bot.sendMessage(
+                    msg.chat.id,
 
 `📅 ENTER EXPIRY DATE
 
@@ -705,25 +848,25 @@ BOTH`
 
 Example:
 15-Jun-2026`
-            );
+                );
 
-            return;
-        }
+                return;
+            }
 
-        /*
-========================================
-EXPIRY DATE
-========================================
-*/
+            /*
+            ----------------------------------------
+            EXPIRY
+            ----------------------------------------
+            */
 
-if(session.step === 'expiry') {
+            if(session.step === 'expiry') {
 
-    session.data.expiry = msg.text;
+                session.data.expiry = msg.text;
 
-    session.step = 'payment';
+                session.step = 'payment';
 
-    bot.sendMessage(
-        msg.chat.id,
+                bot.sendMessage(
+                    msg.chat.id,
 
 `💰 ENTER LAST PAYMENT
 
@@ -731,536 +874,44 @@ if(session.step === 'expiry') {
 
 Example:
 500`
-    );
+                );
 
-    return;
-}
+                return;
+            }
 
-/*
-========================================
-LAST PAYMENT
-========================================
-*/
+            /*
+            ----------------------------------------
+            PAYMENT
+            ----------------------------------------
+            */
 
-if(session.step === 'payment') {
+            if(session.step === 'payment') {
 
-    session.data.payment = msg.text;
+                session.data.payment = msg.text;
 
-    session.step = 'country_code';
+                session.step = 'country_code';
 
-    bot.sendMessage(
-        msg.chat.id,
+                bot.sendMessage(
+                    msg.chat.id,
 
 `🌍 ENTER COUNTRY CODE
 
 ━━━━━━━━━━━━━━
 
 Example:
-91`
-    );
+91`,
 
-    return;
-}
-
-/*
-========================================
-COUNTRY CODE
-========================================
-*/
-
-if(session.step === 'country_code') {
-
-    session.data.countryCode = msg.text;
-
-    session.step = 'mobile';
-
-    bot.sendMessage(
-        msg.chat.id,
-
-`📞 ENTER MOBILE NUMBER
-
-━━━━━━━━━━━━━━
-
-Example:
-9876543210`
-    );
-
-    return;
-}
-
-/*
-========================================
-MOBILE NUMBER
-========================================
-*/
-
-if(session.step === 'mobile') {
-
-    session.data.mobile = msg.text;
-
-    /*
-========================================
-GENERATE NEXT CODE
-========================================
-*/
-
-const code = await generateNextCode();
-
-    /*
-    ========================================
-    TODAY DATE
-    ========================================
-    */
-
-    const today = new Date();
-
-    const paidDate = today
-        .toLocaleDateString(
-            'en-GB',
-            {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric'
-            }
-        )
-        .replace(/ /g, '-');
-
-    /*
-    ========================================
-    RENEW DATE
-    ========================================
-    */
-
-    const expiryParts =
-    session.data.expiry.split('-');
-
-    const months = {
-        Jan: 0,
-        Feb: 1,
-        Mar: 2,
-        Apr: 3,
-        May: 4,
-        Jun: 5,
-        Jul: 6,
-        Aug: 7,
-        Sep: 8,
-        Oct: 9,
-        Nov: 10,
-        Dec: 11
-    };
-
-    const expiryDate = new Date(
-        parseInt(expiryParts[2]),
-        months[expiryParts[1]],
-        parseInt(expiryParts[0])
-    );
-
-    expiryDate.setDate(
-        expiryDate.getDate() - 5
-    );
-
-    const renewDate = expiryDate
-        .toLocaleDateString(
-            'en-GB',
-            {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric'
-            }
-        )
-        .replace(/ /g, '-');
-
-    /*
-    ========================================
-    INSERT GOOGLE SHEET ROW
-    ========================================
-    */
-
-    const sheet = await loadUsersSheet();
-
-    await sheet.addRow({
-
-        Code: code,
-
-        Paid: paidDate,
-
-        Expiry: session.data.expiry,
-
-        Renew: renewDate,
-
-        Active: 'TRUE',
-
-        Instances: session.data.plan,
-
-        'Last payment':
-        session.data.payment,
-
-        'User Name':
-        session.data.userName,
-
-        'User Country Code':
-        session.data.countryCode,
-
-        'User Mobile':
-        session.data.mobile,
-
-        'User Telegram Id': ''
-    });
-
-    /*
-    ========================================
-    SUCCESS MESSAGE
-    ========================================
-    */
-
-    bot.sendMessage(
-        msg.chat.id,
-
-`✅ USER CREATED
-
-━━━━━━━━━━━━━━
-
-👤 User
-${session.data.userName}
-
-🔑 Code
-${code}
-
-📦 Plan
-${session.data.plan}
-
-💰 Payment
-${session.data.payment}
-
-📞 Mobile
-+${session.data.countryCode}
-${session.data.mobile}
-
-📅 Expiry
-${session.data.expiry}
-
-📅 Renew
-${renewDate}
-
-━━━━━━━━━━━━━━`
-    );
-
-    /*
-    ========================================
-    CLEAR SESSION
-    ========================================
-    */
-
-    delete adminSessions[msg.chat.id];
-
-    return;
-}
-
-    }
-
-    catch(error) {
-
-        console.log(error);
-    }
-});
-
-/*
-========================================
-VALIDATE
-========================================
-*/
-
-bot.on('message', async (msg) => {
-
-    try {
-
-        if(!msg.text) return;
-
-/*
-========================================
-IGNORE ADMIN SESSIONS
-========================================
-*/
-
-if(adminSessions[msg.chat.id]) {
-    return;
-}
-
-if(!msg.text.startsWith('/validate')) return;
-
-        const parts = msg.text.split(' ');
-
-        if(parts.length < 2) {
-
-            bot.sendMessage(msg.chat.id,
-`❌ INVALID FORMAT
-
-Use:
-/validate CODE
-
-Need Help?
-/admincontact`);
-
-            return;
-        }
-
-        const code = parts[1].trim();
-
-        const user = await getUserByCode(code);
-
-        if(!user) {
-
-            bot.sendMessage(msg.chat.id,
-`❌ CODE NOT FOUND
-
-Need Help?
-/admincontact`);
-
-            return;
-        }
-
-        if(user.Active.toUpperCase() !== 'TRUE') {
-
-            bot.sendMessage(msg.chat.id,
-`❌ ACCESS DISABLED
-
-Need Help?
-/admincontact`);
-
-            return;
-        }
-
-        if(isExpired(user.Expiry)) {
-
-            bot.sendMessage(msg.chat.id,
-`⚠️ INSTANCE EXPIRED
-
-Expiry Date
-${user.Expiry}
-
-Need Help?
-/admincontact`);
-
-            return;
-        }
-
-        /*
-        ========================================
-        TELEGRAM SECURITY
-        ========================================
-        */
-
-        if(
-            user.UserTelegramId &&
-            user.UserTelegramId !== msg.chat.id.toString()
-        ) {
-
-            bot.sendMessage(msg.chat.id,
-`❌ THIS CODE IS ALREADY LINKED TO ANOTHER TELEGRAM ACCOUNT
-
-Need Help?
-/admincontact`);
-
-            return;
-        }
-
-        /*
-        ========================================
-        FIRST TIME USER
-        ========================================
-        */
-
-        if(
-            !user.UserTelegramId ||
-            user.UserTelegramId.trim() === ''
-        ) {
-
-            if(process.env.ADMIN_ID) {
-
-    bot.sendMessage(
-        process.env.ADMIN_ID,
-
-`🚨 NEW USER VALIDATION
-
-━━━━━━━━━━━━━━
-
-👤 User
-${user.UserName || 'N/A'}
-
-🔑 Code
-${user.Code}
-
-📦 Plan
-${user.Instances}
-
-📱 Telegram ID
-${msg.from.id}
-
-🧑 Username
-@${msg.from.username || 'N/A'}
-
-🌍 Country Code
-${user.UserCountryCode || 'N/A'}
-
-📞 Mobile
-${user.UserMobile || 'N/A'}
-
-━━━━━━━━━━━━━━`,
-
-{
-    reply_markup: {
-        inline_keyboard: [
-            [
-                {
-                    text: '✅ Approve',
-                    callback_data:
-                    `approve_${user.Code}_${msg.from.id}`
-                },
-                {
-                    text: '❌ Reject',
-                    callback_data:
-                    `reject_${user.Code}_${msg.from.id}`
-                }
-            ]
-        ]
-    }
-});
-}
-
-            bot.sendMessage(msg.chat.id,
-`⏳ REQUEST SUBMITTED
-
-━━━━━━━━━━━━━━
-
-Your validation request has been sent to admin.
-
-Please wait for approval.
-
-Approx Time
-5 Minutes
-
-Need Help?
-/admincontact
-
-━━━━━━━━━━━━━━`);
-
-            return;
-        }
-
-        /*
-        ========================================
-        APPROVED USER
-        ========================================
-        */
-
-        bot.sendMessage(msg.chat.id,
-`✅ BILL VALIDATED
-
-━━━━━━━━━━━━━━
-
-👤 User
-${user.UserName || 'N/A'}
-
-🔑 Code
-${user.Code}
-
-📦 Plan
-${user.Instances}
-
-📅 Expiry
-${user.Expiry}
-
-🟢 Status
-ACTIVE
-
-Need Help?
-/admincontact
-
-━━━━━━━━━━━━━━`);
-
-    }
-
-    catch(error) {
-
-        console.log(error);
-
-        bot.sendMessage(msg.chat.id,
-`❌ ERROR
-
-${error.message}
-
-Need Help?
-/admincontact`);
-    }
-});
-
-/*
-========================================
-APPROVE / REJECT CALLBACK
-========================================
-*/
-
-bot.on('callback_query', async (query) => {
-
-    try {
-
-        /*
-        ========================================
-        ADMIN SECURITY
-        ========================================
-        */
-
-        if(
-            query.from.id.toString() !==
-            process.env.ADMIN_ID
-        ) {
-
-            bot.answerCallbackQuery(
-                query.id,
-                {
-                    text: 'Unauthorized'
-                }
-            );
-
-            return;
-        }
-
-        /*
-        ========================================
-        GET CALLBACK DATA
-        ========================================
-        */
-
-        const data = query.data;
-
-        const parts = data.split('_');
-
-        const action = parts[0];
-
-        const code = parts[1];
-
-        const telegramId = parts[2];
-
-        /*
-        ========================================
-        APPROVE
-        ========================================
-        */
-
-        if(action === 'approve') {
-
-            const result =
-            await updateTelegramId(
-                code,
-                telegramId
-            );
-
-            if(!result.success) {
-
-                bot.answerCallbackQuery(
-                    query.id,
                     {
-                        text: result.message
+                        reply_markup: {
+                            inline_keyboard: [
+                                [
+                                    {
+                                        text: '⏭ Skip',
+                                        callback_data: 'skip_country'
+                                    }
+                                ]
+                            ]
+                        }
                     }
                 );
 
@@ -1268,619 +919,33 @@ bot.on('callback_query', async (query) => {
             }
 
             /*
-            ========================================
-            REMOVE BUTTONS
-            ========================================
+            ----------------------------------------
+            COUNTRY CODE (TEXT INPUT)
+            ----------------------------------------
             */
 
-            await bot.editMessageReplyMarkup(
-                {
-                    inline_keyboard: []
-                },
-                {
-                    chat_id:
-                    query.message.chat.id,
+            if(session.step === 'country_code') {
 
-                    message_id:
-                    query.message.message_id
-                }
-            );
+                session.data.countryCode = msg.text;
 
-            /*
-            ========================================
-            ADMIN SUCCESS
-            ========================================
-            */
+                session.step = 'mobile';
 
-            bot.answerCallbackQuery(
-                query.id,
-                {
-                    text: 'User Approved'
-                }
-            );
+                bot.sendMessage(
+                    msg.chat.id,
 
-            /*
-            ========================================
-            USER MESSAGE
-            ========================================
-            */
-
-            bot.sendMessage(
-                telegramId,
-
-`✅ ACCOUNT APPROVED
+`📞 ENTER MOBILE NUMBER
 
 ━━━━━━━━━━━━━━
 
-Your account has been approved successfully.
-
-You can now use:
-
-/start
-
-━━━━━━━━━━━━━━`
-            );
-
-            return;
-        }
-
-        /*
-        ========================================
-        REJECT
-        ========================================
-        */
-
-        if(action === 'reject') {
-
-            /*
-            ========================================
-            REMOVE BUTTONS
-            ========================================
-            */
-
-            await bot.editMessageReplyMarkup(
-                {
-                    inline_keyboard: []
-                },
-                {
-                    chat_id:
-                    query.message.chat.id,
-
-                    message_id:
-                    query.message.message_id
-                }
-            );
-
-            /*
-            ========================================
-            ADMIN POPUP
-            ========================================
-            */
-
-            bot.answerCallbackQuery(
-                query.id,
-                {
-                    text: 'User Rejected'
-                }
-            );
-
-            /*
-            ========================================
-            USER MESSAGE
-            ========================================
-            */
-
-            bot.sendMessage(
-                telegramId,
-
-`❌ VALIDATION REJECTED
-
-━━━━━━━━━━━━━━
-
-Your validation request was rejected.
-
-Need Help?
-/admincontact
-
-━━━━━━━━━━━━━━`
-            );
-
-            return;
-        }
-
-    }
-
-    catch(error) {
-
-        console.log(error);
-    }
-});
-
-/*
-========================================
-ADMIN CONTACT
-========================================
-*/
-
-bot.onText(/^\/admincontact$/, async (msg) => {
-
-    bot.sendMessage(msg.chat.id,
-`👨‍💻 ADMIN CONTACT
-
-━━━━━━━━━━━━━━
-
-Telegram
-@KLRAHUL_5646
-
-━━━━━━━━━━━━━━
-
-For:
-• Renewal
-• Login Issues
-• Expiry Issues
-• Access Problems
-• Technical Support
-
-━━━━━━━━━━━━━━`);
-});
-
-/*
-========================================
-EXPIRY
-========================================
-*/
-
-bot.onText(/^\/expiry$/, async (msg) => {
-
-    try {
-
-        const result = await validateUserAccess(msg.chat.id);
-
-        if(!result.success) {
-
-            bot.sendMessage(msg.chat.id, result.message);
-
-            return;
-        }
-
-        const user = result.user;
-
-        bot.sendMessage(msg.chat.id,
-`📅 SUBSCRIPTION DETAILS
-
-━━━━━━━━━━━━━━
-
-👤 User
-${user.UserName || 'N/A'}
-
-🔑 Code
-${user.Code}
-
-📦 Plan
-${user.Instances}
-
-💰 Last Payment
-${user.LastPayment || 'N/A'}
-
-📅 Expiry
-${user.Expiry}
-
-🔄 Renew Before
-${user.Renew}
-
-🟢 Status
-ACTIVE
-
-Need Help?
-/admincontact
-
-━━━━━━━━━━━━━━`);
-    }
-
-    catch(error) {
-
-        console.log(error);
-    }
-});
-
-/*
-========================================
-RENEW
-========================================
-*/
-
-bot.onText(/^\/renew$/, async (msg) => {
-
-    try {
-
-        const result = await validateUserAccess(msg.chat.id);
-
-        if(!result.success) {
-
-            bot.sendMessage(msg.chat.id, result.message);
-
-            return;
-        }
-
-        const user = result.user;
-
-        bot.sendMessage(msg.chat.id,
-`💳 RENEW SUBSCRIPTION
-
-━━━━━━━━━━━━━━
-
-👤 User
-${user.UserName || 'N/A'}
-
-🔑 Code
-${user.Code}
-
-📦 Plan
-${user.Instances}
-
-📅 Expiry
-${user.Expiry}
-
-━━━━━━━━━━━━━━
-
-CONTACT ADMIN
-
-Telegram
-@KLRAHUL_5646
-
-━━━━━━━━━━━━━━`);
-    }
-
-    catch(error) {
-
-        console.log(error);
-    }
-});
-
-/*
-========================================
-FUSION INSTANCE
-========================================
-*/
-
-bot.onText(/^\/fusioninstance$/, async (msg) => {
-
-    try {
-
-        const result = await validateUserAccess(msg.chat.id);
-
-        if(!result.success) {
-
-            bot.sendMessage(msg.chat.id, result.message);
-
-            return;
-        }
-
-        const user = result.user;
-
-        if(!hasFusionAccess(user.Instances)) {
-
-            bot.sendMessage(msg.chat.id,
-`❌ FUSION ACCESS NOT AVAILABLE
-
-Need Help?
-/admincontact`);
-
-            return;
-        }
-
-        const creds = await getCredentials();
-
-        bot.sendMessage(msg.chat.id,
-`🚀 FUSION INSTANCE DETAIL
-
-━━━━━━━━━━━━━━
-
-${creds.fusion}
-
-━━━━━━━━━━━━━━
-
-Need Help?
-/admincontact`);
-    }
-
-    catch(error) {
-
-        console.log(error);
-    }
-});
-
-/*
-========================================
-OIC INSTANCE
-========================================
-*/
-
-bot.onText(/^\/oicinstance$/, async (msg) => {
-
-    try {
-
-        const result = await validateUserAccess(msg.chat.id);
-
-        if(!result.success) {
-
-            bot.sendMessage(msg.chat.id, result.message);
-
-            return;
-        }
-
-        const user = result.user;
-
-        if(!hasOICAccess(user.Instances)) {
-
-            bot.sendMessage(msg.chat.id,
-`❌ OIC ACCESS NOT AVAILABLE
-
-Need Help?
-/admincontact`);
-
-            return;
-        }
-
-        const creds = await getCredentials();
-
-        bot.sendMessage(msg.chat.id,
-`☁️ OIC INSTANCE DETAIL
-
-━━━━━━━━━━━━━━
-
-${creds.oic}
-
-━━━━━━━━━━━━━━
-
-Need Help?
-/admincontact`);
-    }
-
-    catch(error) {
-
-        console.log(error);
-    }
-});
-
-/*
-========================================
-SFTP DETAIL
-========================================
-*/
-
-bot.onText(/^\/oicsftpdetail$/, async (msg) => {
-
-    try {
-
-        const result = await validateUserAccess(msg.chat.id);
-
-        if(!result.success) {
-
-            bot.sendMessage(msg.chat.id, result.message);
-
-            return;
-        }
-
-        const user = result.user;
-
-        if(!hasOICAccess(user.Instances)) {
-
-            bot.sendMessage(msg.chat.id,
-`❌ OIC ACCESS NOT AVAILABLE
-
-Need Help?
-/admincontact`);
-
-            return;
-        }
-
-        const creds = await getCredentials();
-
-        bot.sendMessage(msg.chat.id,
-`📂 SFTP DETAIL
-
-━━━━━━━━━━━━━━
-
-${creds.sftp}
-
-━━━━━━━━━━━━━━
-
-Need Help?
-/admincontact`);
-    }
-
-    catch(error) {
-
-        console.log(error);
-    }
-});
-
-/*
-========================================
-ATP DETAIL
-========================================
-*/
-
-bot.onText(/^\/atpdetail$/, async (msg) => {
-
-    try {
-
-        const result = await validateUserAccess(msg.chat.id);
-
-        if(!result.success) {
-
-            bot.sendMessage(msg.chat.id, result.message);
-
-            return;
-        }
-
-        const user = result.user;
-
-        if(!hasOICAccess(user.Instances)) {
-
-            bot.sendMessage(msg.chat.id,
-`❌ OIC ACCESS NOT AVAILABLE
-
-Need Help?
-/admincontact`);
-
-            return;
-        }
-
-        const creds = await getCredentials();
-
-        bot.sendMessage(msg.chat.id,
-`🗄 ATP DETAIL
-
-━━━━━━━━━━━━━━
-
-${creds.atp}
-
-━━━━━━━━━━━━━━
-
-Need Help?
-/admincontact`);
-    }
-
-    catch(error) {
-
-        console.log(error);
-    }
-});
-
-/*
-========================================
-FTP DETAIL
-========================================
-*/
-
-bot.onText(/^\/ftpdetail$/, async (msg) => {
-
-    try {
-
-        const result = await validateUserAccess(msg.chat.id);
-
-        if(!result.success) {
-
-            bot.sendMessage(msg.chat.id, result.message);
-
-            return;
-        }
-
-        const user = result.user;
-
-        if(!hasOICAccess(user.Instances)) {
-
-            bot.sendMessage(msg.chat.id,
-`❌ OIC ACCESS NOT AVAILABLE
-
-Need Help?
-/admincontact`);
-
-            return;
-        }
-
-        const creds = await getCredentials();
-
-        bot.sendMessage(msg.chat.id,
-`📁 FTP DETAIL
-
-━━━━━━━━━━━━━━
-
-${creds.ftp}
-
-━━━━━━━━━━━━━━
-
-Need Help?
-/admincontact`);
-    }
-
-    catch(error) {
-
-        console.log(error);
-    }
-});
-
-/*
-========================================
-VBCS DB DETAIL
-========================================
-*/
-
-bot.onText(/^\/vbcsdbdetail$/, async (msg) => {
-
-    try {
-
-        const result = await validateUserAccess(msg.chat.id);
-
-        if(!result.success) {
-
-            bot.sendMessage(msg.chat.id, result.message);
-
-            return;
-        }
-
-        const user = result.user;
-
-        if(!hasOICAccess(user.Instances)) {
-
-            bot.sendMessage(msg.chat.id,
-`❌ OIC ACCESS NOT AVAILABLE
-
-Need Help?
-/admincontact`);
-
-            return;
-        }
-
-        const creds = await getCredentials();
-
-        bot.sendMessage(msg.chat.id,
-`🗃 VBCS DB DETAIL
-
-━━━━━━━━━━━━━━
-
-${creds.vbcs}
-
-━━━━━━━━━━━━━━
-
-Need Help?
-/admincontact`);
-    }
-
-    catch(error) {
-
-        console.log(error);
-    }
-});
-
-/*
-========================================
-ROOT
-========================================
-*/
-
-app.get('/', (req, res) => {
-
-    res.send('Bot Running...');
-});
-
-app.get('/health', (req, res) => {
-
-    res.status(200).send('OK');
-});
-
-/*
-========================================
-START SERVER
-========================================
-*/
-
-app.listen(PORT, () => {
-
-    console.log('Bot Running...');
-    console.log(`Server running on port ${PORT}`);
-});
-
-console.log('Bot Running...');
+Example:
+9876543210`,
+
+                    {
+                        reply_markup: {
+                            inline_keyboard: [
+                                [
+                                    {
+                                        text: '⏭ Skip',
+                                        callback_data: 'skip_mobile'
+                                    }
+      
