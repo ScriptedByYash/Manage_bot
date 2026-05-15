@@ -946,6 +946,718 @@ Example:
                                 [
                                     {
                                         text: '⏭ Skip',
-                                        callback_data: 'skip_mobile'
-                                    }
-      
+                                    callback_data: 'skip_mobile'
+                                }
+                            ]
+                        ]
+                    }
+                }
+            );
+
+            return;
+        }
+
+        /*
+        ========================================
+        SKIP MOBILE (CREATE USER)
+        ========================================
+        */
+
+        if(data === 'skip_mobile') {
+
+            const session = adminSessions[chatId];
+
+            if(!session || session.action !== 'create_user') return;
+
+            session.data.mobile = '';
+
+            bot.answerCallbackQuery(query.id, { text: 'Mobile Skipped' });
+
+            await saveNewUser(chatId, session.data);
+
+            return;
+        }
+
+        /*
+        ========================================
+        UPDATE USER - CANCEL
+        ========================================
+        */
+
+        if(data === 'upd_cancel') {
+
+            delete adminSessions[chatId];
+
+            await bot.editMessageReplyMarkup(
+                { inline_keyboard: [] },
+                {
+                    chat_id: chatId,
+                    message_id: query.message.message_id
+                }
+            );
+
+            bot.answerCallbackQuery(query.id, { text: 'Cancelled' });
+
+            bot.sendMessage(chatId, '❌ Update Cancelled');
+
+            return;
+        }
+
+        /*
+        ========================================
+        UPDATE USER - FIELD SELECTION
+        ========================================
+        */
+
+        if(data.startsWith('upd_field_')) {
+
+            const session = adminSessions[chatId];
+
+            if(!session || session.action !== 'update_user') return;
+
+            await bot.editMessageReplyMarkup(
+                { inline_keyboard: [] },
+                {
+                    chat_id: chatId,
+                    message_id: query.message.message_id
+                }
+            );
+
+            const fieldMap = {
+                'upd_field_name':     { label: '👤 Name',        sheet: 'User Name',          type: 'text' },
+                'upd_field_plan':     { label: '📦 Plan',        sheet: 'Instances',           type: 'plan' },
+                'upd_field_expiry':   { label: '📅 Expiry',      sheet: 'Expiry',              type: 'text' },
+                'upd_field_payment':  { label: '💰 Payment',     sheet: 'Last payment',        type: 'text' },
+                'upd_field_country':  { label: '🌍 Country Code', sheet: 'User Country Code',  type: 'text' },
+                'upd_field_mobile':   { label: '📞 Mobile',      sheet: 'User Mobile',         type: 'text' },
+                'upd_field_active':   { label: '🔘 Active',      sheet: 'Active',              type: 'active' },
+                'upd_field_telegram': { label: '📱 Telegram ID', sheet: 'User Telegram Id',   type: 'text' }
+            };
+
+            const selected = fieldMap[data];
+
+            if(!selected) return;
+
+            session.data.field = selected.sheet;
+            session.data.fieldLabel = selected.label;
+
+            bot.answerCallbackQuery(query.id, { text: selected.label + ' Selected' });
+
+            /*
+            ----------------------------------------
+            PLAN - SHOW BUTTONS
+            ----------------------------------------
+            */
+
+            if(selected.type === 'plan') {
+
+                bot.sendMessage(
+                    chatId,
+
+`📦 SELECT NEW PLAN
+
+━━━━━━━━━━━━━━
+
+Code: ${session.data.code}`,
+
+                    {
+                        reply_markup: {
+                            inline_keyboard: [
+                                [
+                                    { text: 'OIC', callback_data: 'upd_val_OIC' },
+                                    { text: 'FUSION', callback_data: 'upd_val_FUSION' },
+                                    { text: 'BOTH', callback_data: 'upd_val_BOTH' }
+                                ],
+                                [
+                                    { text: '❌ Cancel', callback_data: 'upd_cancel' }
+                                ]
+                            ]
+                        }
+                    }
+                );
+
+                return;
+            }
+
+            /*
+            ----------------------------------------
+            ACTIVE - SHOW BUTTONS
+            ----------------------------------------
+            */
+
+            if(selected.type === 'active') {
+
+                bot.sendMessage(
+                    chatId,
+
+`🔘 SELECT ACTIVE STATUS
+
+━━━━━━━━━━━━━━
+
+Code: ${session.data.code}`,
+
+                    {
+                        reply_markup: {
+                            inline_keyboard: [
+                                [
+                                    { text: '✅ TRUE', callback_data: 'upd_val_TRUE' },
+                                    { text: '❌ FALSE', callback_data: 'upd_val_FALSE' }
+                                ],
+                                [
+                                    { text: '❌ Cancel', callback_data: 'upd_cancel' }
+                                ]
+                            ]
+                        }
+                    }
+                );
+
+                return;
+            }
+
+            /*
+            ----------------------------------------
+            TEXT - ASK TO TYPE
+            ----------------------------------------
+            */
+
+            session.step = 'enter_value';
+
+            bot.sendMessage(
+                chatId,
+
+`✏️ ENTER NEW VALUE
+
+━━━━━━━━━━━━━━
+
+Field: ${selected.label}
+Code: ${session.data.code}
+
+Type new value:`
+            );
+
+            return;
+        }
+
+        /*
+        ========================================
+        UPDATE USER - VALUE BUTTONS (PLAN/ACTIVE)
+        ========================================
+        */
+
+        if(data.startsWith('upd_val_')) {
+
+            const session = adminSessions[chatId];
+
+            if(!session || session.action !== 'update_user') return;
+
+            const newValue = data.replace('upd_val_', '');
+
+            const result = await updateUserField(
+                session.data.code,
+                session.data.field,
+                newValue
+            );
+
+            await bot.editMessageReplyMarkup(
+                { inline_keyboard: [] },
+                {
+                    chat_id: chatId,
+                    message_id: query.message.message_id
+                }
+            );
+
+            if(!result.success) {
+
+                bot.answerCallbackQuery(query.id, { text: 'Update Failed' });
+
+                bot.sendMessage(chatId, `❌ Update Failed: ${result.message}`);
+
+                delete adminSessions[chatId];
+
+                return;
+            }
+
+            bot.answerCallbackQuery(query.id, { text: 'Updated!' });
+
+            bot.sendMessage(
+                chatId,
+
+`✅ UPDATED SUCCESSFULLY
+
+━━━━━━━━━━━━━━
+
+🔑 Code
+${session.data.code}
+
+📝 Field
+${session.data.fieldLabel}
+
+✏️ New Value
+${newValue}
+
+━━━━━━━━━━━━━━`
+            );
+
+            delete adminSessions[chatId];
+
+            return;
+        }
+
+    } catch(error) {
+        console.log(error);
+    }
+});
+
+/*
+========================================
+ADMIN CONTACT
+========================================
+*/
+
+bot.onText(/^\/admincontact$/, async (msg) => {
+
+    bot.sendMessage(msg.chat.id,
+`👨‍💻 ADMIN CONTACT
+
+━━━━━━━━━━━━━━
+
+Telegram
+@KLRAHUL_5646
+
+━━━━━━━━━━━━━━
+
+For:
+• Renewal
+• Login Issues
+• Expiry Issues
+• Access Problems
+• Technical Support
+
+━━━━━━━━━━━━━━`);
+});
+
+/*
+========================================
+EXPIRY
+========================================
+*/
+
+bot.onText(/^\/expiry$/, async (msg) => {
+
+    try {
+
+        const result = await validateUserAccess(msg.chat.id);
+
+        if(!result.success) {
+            bot.sendMessage(msg.chat.id, result.message);
+            return;
+        }
+
+        const user = result.user;
+
+        bot.sendMessage(msg.chat.id,
+`📅 SUBSCRIPTION DETAILS
+
+━━━━━━━━━━━━━━
+
+👤 User
+${user.UserName || 'N/A'}
+
+🔑 Code
+${user.Code}
+
+📦 Plan
+${user.Instances}
+
+💰 Last Payment
+${user.LastPayment || 'N/A'}
+
+📅 Expiry
+${user.Expiry}
+
+🔄 Renew Before
+${user.Renew}
+
+🟢 Status
+ACTIVE
+
+Need Help?
+/admincontact
+
+━━━━━━━━━━━━━━`);
+
+    } catch(error) {
+        console.log(error);
+    }
+});
+
+/*
+========================================
+RENEW
+========================================
+*/
+
+bot.onText(/^\/renew$/, async (msg) => {
+
+    try {
+
+        const result = await validateUserAccess(msg.chat.id);
+
+        if(!result.success) {
+            bot.sendMessage(msg.chat.id, result.message);
+            return;
+        }
+
+        const user = result.user;
+
+        bot.sendMessage(msg.chat.id,
+`💳 RENEW SUBSCRIPTION
+
+━━━━━━━━━━━━━━
+
+👤 User
+${user.UserName || 'N/A'}
+
+🔑 Code
+${user.Code}
+
+📦 Plan
+${user.Instances}
+
+📅 Expiry
+${user.Expiry}
+
+━━━━━━━━━━━━━━
+
+CONTACT ADMIN
+
+Telegram
+@KLRAHUL_5646
+
+━━━━━━━━━━━━━━`);
+
+    } catch(error) {
+        console.log(error);
+    }
+});
+
+/*
+========================================
+FUSION INSTANCE
+========================================
+*/
+
+bot.onText(/^\/fusioninstance$/, async (msg) => {
+
+    try {
+
+        const result = await validateUserAccess(msg.chat.id);
+
+        if(!result.success) {
+            bot.sendMessage(msg.chat.id, result.message);
+            return;
+        }
+
+        const user = result.user;
+
+        if(!hasFusionAccess(user.Instances)) {
+
+            bot.sendMessage(msg.chat.id,
+`❌ FUSION ACCESS NOT AVAILABLE
+
+Need Help?
+/admincontact`);
+
+            return;
+        }
+
+        const creds = await getCredentials();
+
+        bot.sendMessage(msg.chat.id,
+`🚀 FUSION INSTANCE DETAIL
+
+━━━━━━━━━━━━━━
+
+${creds.fusion}
+
+━━━━━━━━━━━━━━
+
+Need Help?
+/admincontact`);
+
+    } catch(error) {
+        console.log(error);
+    }
+});
+
+/*
+========================================
+OIC INSTANCE
+========================================
+*/
+
+bot.onText(/^\/oicinstance$/, async (msg) => {
+
+    try {
+
+        const result = await validateUserAccess(msg.chat.id);
+
+        if(!result.success) {
+            bot.sendMessage(msg.chat.id, result.message);
+            return;
+        }
+
+        const user = result.user;
+
+        if(!hasOICAccess(user.Instances)) {
+
+            bot.sendMessage(msg.chat.id,
+`❌ OIC ACCESS NOT AVAILABLE
+
+Need Help?
+/admincontact`);
+
+            return;
+        }
+
+        const creds = await getCredentials();
+
+        bot.sendMessage(msg.chat.id,
+`☁️ OIC INSTANCE DETAIL
+
+━━━━━━━━━━━━━━
+
+${creds.oic}
+
+━━━━━━━━━━━━━━
+
+Need Help?
+/admincontact`);
+
+    } catch(error) {
+        console.log(error);
+    }
+});
+
+/*
+========================================
+SFTP DETAIL
+========================================
+*/
+
+bot.onText(/^\/oicsftpdetail$/, async (msg) => {
+
+    try {
+
+        const result = await validateUserAccess(msg.chat.id);
+
+        if(!result.success) {
+            bot.sendMessage(msg.chat.id, result.message);
+            return;
+        }
+
+        const user = result.user;
+
+        if(!hasOICAccess(user.Instances)) {
+
+            bot.sendMessage(msg.chat.id,
+`❌ OIC ACCESS NOT AVAILABLE
+
+Need Help?
+/admincontact`);
+
+            return;
+        }
+
+        const creds = await getCredentials();
+
+        bot.sendMessage(msg.chat.id,
+`📂 SFTP DETAIL
+
+━━━━━━━━━━━━━━
+
+${creds.sftp}
+
+━━━━━━━━━━━━━━
+
+Need Help?
+/admincontact`);
+
+    } catch(error) {
+        console.log(error);
+    }
+});
+
+/*
+========================================
+ATP DETAIL
+========================================
+*/
+
+bot.onText(/^\/atpdetail$/, async (msg) => {
+
+    try {
+
+        const result = await validateUserAccess(msg.chat.id);
+
+        if(!result.success) {
+            bot.sendMessage(msg.chat.id, result.message);
+            return;
+        }
+
+        const user = result.user;
+
+        if(!hasOICAccess(user.Instances)) {
+
+            bot.sendMessage(msg.chat.id,
+`❌ OIC ACCESS NOT AVAILABLE
+
+Need Help?
+/admincontact`);
+
+            return;
+        }
+
+        const creds = await getCredentials();
+
+        bot.sendMessage(msg.chat.id,
+`🗄 ATP DETAIL
+
+━━━━━━━━━━━━━━
+
+${creds.atp}
+
+━━━━━━━━━━━━━━
+
+Need Help?
+/admincontact`);
+
+    } catch(error) {
+        console.log(error);
+    }
+});
+
+/*
+========================================
+FTP DETAIL
+========================================
+*/
+
+bot.onText(/^\/ftpdetail$/, async (msg) => {
+
+    try {
+
+        const result = await validateUserAccess(msg.chat.id);
+
+        if(!result.success) {
+            bot.sendMessage(msg.chat.id, result.message);
+            return;
+        }
+
+        const user = result.user;
+
+        if(!hasOICAccess(user.Instances)) {
+
+            bot.sendMessage(msg.chat.id,
+`❌ OIC ACCESS NOT AVAILABLE
+
+Need Help?
+/admincontact`);
+
+            return;
+        }
+
+        const creds = await getCredentials();
+
+        bot.sendMessage(msg.chat.id,
+`📁 FTP DETAIL
+
+━━━━━━━━━━━━━━
+
+${creds.ftp}
+
+━━━━━━━━━━━━━━
+
+Need Help?
+/admincontact`);
+
+    } catch(error) {
+        console.log(error);
+    }
+});
+
+/*
+========================================
+VBCS DB DETAIL
+========================================
+*/
+
+bot.onText(/^\/vbcsdbdetail$/, async (msg) => {
+
+    try {
+
+        const result = await validateUserAccess(msg.chat.id);
+
+        if(!result.success) {
+            bot.sendMessage(msg.chat.id, result.message);
+            return;
+        }
+
+        const user = result.user;
+
+        if(!hasOICAccess(user.Instances)) {
+
+            bot.sendMessage(msg.chat.id,
+`❌ OIC ACCESS NOT AVAILABLE
+
+Need Help?
+/admincontact`);
+
+            return;
+        }
+
+        const creds = await getCredentials();
+
+        bot.sendMessage(msg.chat.id,
+`🗃 VBCS DB DETAIL
+
+━━━━━━━━━━━━━━
+
+${creds.vbcs}
+
+━━━━━━━━━━━━━━
+
+Need Help?
+/admincontact`);
+
+    } catch(error) {
+        console.log(error);
+    }
+});
+
+/*
+========================================
+ROOT & HEALTH
+========================================
+*/
+
+app.get('/', (req, res) => {
+    res.send('Bot Running...');
+});
+
+app.get('/health', (req, res) => {
+    res.status(200).send('OK');
+});
+
+/*
+========================================
+START SERVER
+========================================
+*/
+
+app.listen(PORT, () => {
+    console.log('Bot Running...');
+    console.log(`Server running on port ${PORT}`);
+});
+
+console.log('Bot Running...');
